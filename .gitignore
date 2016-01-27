@@ -1,0 +1,11 @@
+__pycache__/
+serial/__pycache__/
+ssa.txt
+dfg.json
+*.*~
+meeting_0831.txt
+tabla.dot
+tabla.ps
+clean.sh
+schedule.json
+tabla.jpeg
