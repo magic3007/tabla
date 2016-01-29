@@ -1,6 +1,6 @@
 # Welcome to Tabla!
 
-Tabla is an innovative framework that accelerates a class of statistical machine learning algorithms. It consists of the domain specific language, design builder, predesigned template, and model compiler. This document will help you get up and running on the model compiler portion.  
+Tabla is an innovative framework that accelerates a class of statistical machine learning algorithms. It consists of a domain specific language, Design Builder, a predesigned template, and a model compiler. This document will help you get up and running on the model compiler portion.  
 
 
 ### Dependencies  
