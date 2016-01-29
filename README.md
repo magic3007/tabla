@@ -3,11 +3,11 @@
 Tabla is an innovative framework that accelerates a class of statistical machine learning algorithms. It consists of the domain specific language, design builder, predesigned template, and model compiler. This document will help you get up and running on the model compiler portion.  
 
 
-*** Dependencies ***  
+### Dependencies  
 The parser is implemented with ANTLR v4.5 parser generator, with Python 3.4.3 as the target language. You also need Java Runtime Environment 1.6 or higher in order to run the compiler, since ANTLR is primarily written in Java. Please refer to the respective online resources in order to install them on your environment.  
 
 
-*** How to invoke the compiler ***  
+### How to invoke the compiler   
 To run the compiler, run the following command:
 
 ```
@@ -21,7 +21,7 @@ This generates a JSON representation of data flow graph and schedule each in a s
 $ dot -Tjpeg <*.dot file> -o <filename>.jpeg
 ```  
 
-*** To generate lexer and parser directly ***  
+### To generate lexer and parser directly  
 Run the following command:
 
 ```
@@ -34,5 +34,5 @@ If you would like to see the lexer tokens, run:
 $ python3 pygrun.py Tabla program --tokens TEST_FILE
 ```  
 
-*** Developers ***  
+### Developers
 This compiler was developed by Joon Kyung Kim and Chenkai Shao, both undergraduate students at Georgia Institute of Technology. For any inquiries, please contact *jkkim@gatech.edu* or *cshao31@gatech.edu*.
