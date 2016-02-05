@@ -1,10 +1,12 @@
 # Welcome to Tabla!
 
-Tabla is an innovative framework that accelerates a class of statistical machine learning algorithms. It consists of a domain specific language, Design Builder, a predesigned template, and a model compiler. This document will help you get up and running on the model compiler portion.  
+Tabla is an innovative framework that accelerates a class of statistical machine learning algorithms. It consists of a domain specific language, Design Builder, a predesigned template, and a model compiler. 
+
+This document will help you get up and running on the model compiler portion.  
 
 
 ### Dependencies  
-The parser is implemented with ANTLR v4.5 parser generator, with Python 3.4.3 as the target language. You also need Java Runtime Environment 1.6 or higher in order to run the compiler, since ANTLR is primarily written in Java. Please refer to the respective online resources in order to install them on your environment.  
+If you would like to generate the lexer and parser, please refer to the "To generate lexer and parser directly" section below. Otherwise, you only need Python 3.4.3 or higher, in order to successfully run the compiler. If you would like to view the graphical representations of the compiler-generated dataflow graphs, Graphviz - graph visualization software - is needed. Please refer to the respective online resources in order to install them on your environment.  
 
 
 ### How to invoke the compiler   
@@ -21,7 +23,9 @@ This generates a JSON representation of data flow graph and schedule each in a s
 $ dot -Tjpeg <*.dot file> -o <filename>.jpeg
 ```  
 
-### To generate lexer and parser directly  
+### To generate lexer and parser directly
+*Dependencies* The parser is implemented with ANTLR v4.5 parser generator, with Python as the target language. You also need Java Runtime Environment 1.6 or higher in order to run the compiler, since ANTLR is primarily written in Java. 
+  
 Run the following command:
 
 ```
