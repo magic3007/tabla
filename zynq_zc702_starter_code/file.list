@@ -1,0 +1,7 @@
+hardware/source/axi_master/axi_master_v3.v
+hardware/source/primitives/FIFO/fifo.v
+hardware/source/primitives/FIFO/fifo_fwft.v
+hardware/source/axi_slave/axi_slave_v2.v
+hardware/source/primitives/MACC/multiplier.v
+hardware/source/top/zynq_wrapper.v
+hardware/source/accelerator/accelerator.v
