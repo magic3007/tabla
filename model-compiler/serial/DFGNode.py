@@ -7,6 +7,7 @@ class DFGNode:
         self.children = []    # order doesn't matter
         self.parents = []      # order matters
         self.dist2sink = None
+        self.dataType = None    # e.g. model_input, gradient, etc.
 
     def toDict(self):
         childrenIDs = []
@@ -15,7 +16,7 @@ class DFGNode:
             childrenIDs.append(child.id)
         for parent in self.parents:
             parentsIDs.append(parent.id)
-        return {'id': self.id, 'operation': self.operation, 'children': childrenIDs, 'parents': parentsIDs, 'dist2sink': self.dist2sink}
+        return {'id': self.id, 'operation': self.operation, 'children': childrenIDs, 'parents': parentsIDs, 'dist2sink': self.dist2sink, 'dataType': self.dataType}
     
     def __str__(self):
         return json.dumps(self.toDict(), sort_keys=True, indent=2)
@@ -29,6 +30,7 @@ class DFGNode:
         self.children = d['children']
         self.parents = d['parents']
         self.dist2sink = d['dist2sink']
+        self.dataType = d['dataType']
     
     def fromStr(self, s):
         self.fromDict(json.loads(s))

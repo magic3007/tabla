@@ -65,7 +65,20 @@ class DotGenerator:
         return dotCode
 
     def getLabel(self, node):
-        return '{"' + str(node.id) + '" [label="' + node.operation + '"]' + '}'
+        # data type color
+        if node.dataType == 'model_input':
+            color = 'skyblue'
+        elif node.dataType == 'model_output':
+            color = 'hotpink'
+        elif node.dataType == 'model':
+            color = 'yellow'
+        elif node.dataType == 'gradient':
+            color = 'green'
+        elif node.dataType == 'constant':
+            color = 'gray'
+        else:
+            return '{"' + str(node.id) + '" [label="' + node.operation + '"]' + '}'
+        return '{"' + str(node.id) + '" [label="' + node.operation + '" style=filled fillcolor="' + color + '"]' + '}'
 
     def writeTo(self, dotCode, path):
         # Write to file

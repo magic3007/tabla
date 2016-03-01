@@ -7,6 +7,7 @@ class DFGGenerator:
         self.iterTable = {}
         self.constTable = {}
         self.linkTable = {}
+        self.gradientTable = {}
         self.dfg = DataFlowGraph()
         self.funcTypeTable = {}
         self.parseTree = None
@@ -31,12 +32,13 @@ class DFGGenerator:
         print("******Before DFG******")
         self.constTable = self.createConstTable()
         self.iterTable = self.createIterTable(self.constTable)
-        self.symTable = self.createSymbolTable(self.constTable)
+        self.symTable, self.gradientTable = self.createSymbolTable(self.constTable)
         self.funcTypeTable = self.createFuncTypeTable()
         print('const table',self.constTable)
         print('iter table',self.iterTable)
         print('symTable',self.symTable)
         print('funcTypeTable',self.funcTypeTable)
+        print('gradientTable', self.gradientTable)
 
         print("================================\n\n")
         # Get statList for all Stats
@@ -58,11 +60,13 @@ class DFGGenerator:
             if len(iterList) is 0:
                 mult = DFGNode()
                 mult.operation = "*"
+                mult.dataType = 'gradient'
                 self.dfg.add(mult)
                 self.connectNode(self.symTable[g], mult)
                 self.connectNode(symTable["mu"], mult)
                 sub = DFGNode()
                 sub.operation = "-"
+                sub.dataType = 'model'
                 self.dfg.add(sub)
                 self.connectNode(mult, sub)
                 self.connectNode(self.symTable[self.linkTable[g]], sub)
@@ -75,11 +79,13 @@ class DFGGenerator:
                         if gSym in self.symTable:
                             mult = DFGNode()
                             mult.operation = "*"
+                            mult.dataType = 'gradient'
                             self.dfg.add(mult)
                             self.connectNode(self.symTable[gSym], mult)
                             self.connectNode(self.symTable["mu"], mult)
                             sub = DFGNode()
                             sub.operation = "-"
+                            sub.dataType = 'model'
                             self.dfg.add(sub)
                             wSym = self.linkTable[g] + '[' + str(i) + ']'
                             self.connectNode(mult, sub)
@@ -91,11 +97,13 @@ class DFGGenerator:
                             if gSym in self.symTable:
                                 mult = DFGNode()
                                 mult.operation = "*"
+                                mult.dataType = 'gradient'
                                 self.dfg.add(mult)
                                 self.connectNode(self.symTable[gSym], mult)
                                 self.connectNode(self.symTable["mu"], mult)
                                 sub = DFGNode()
                                 sub.operation = "-"
+                                sub.dataType = 'model'
                                 self.dfg.add(sub)
                                 wSym = self.linkTable[g] + '[' + str(i) + '][' + str(j) + ']'
                                 self.connectNode(mult, sub)
@@ -164,10 +172,21 @@ class DFGGenerator:
                     for j in range(iter1[0], iter1[1]):
                         iterDict[dimensions[1]] = j
                         resultNode = self.exprTraversal(statNode.getChild(2), iterDict)
+                        # color
+                        if var in self.gradientTable:
+                            resultNode.dataType = 'gradient'
                         self.symTable[var + '[' + str(i) + '][' + str(j) + ']'] = resultNode
                         arr.append(resultNode)
                 else:
-                    resultNode = self.exprTraversal(statNode.getChild(2), iterDict)                
+                    resultNode = self.exprTraversal(statNode.getChild(2), iterDict)
+
+                    # color
+                    print('debug...statTraversal...var is: ', var)
+                    print('debug...statTraversal...var type is: ', type(var))
+                    print('debug...statTraversal...gradientTable is: ', self.gradientTable)
+                    if var in self.gradientTable:
+                        resultNode.dataType = 'gradient'
+                    
                     self.symTable[var + '[' + str(i) + ']'] = resultNode
                     arr.append(resultNode)
 
@@ -278,6 +297,7 @@ class DFGGenerator:
             else:
                 node = DFGNode()
                 node.operation = digit
+                node.dataType = 'constant'
                 self.dfg.add(node)
                 self.connectNode(self.dfg.get(0), node)
                 self.symTable[digit] = node
@@ -393,9 +413,11 @@ class DFGGenerator:
                 
     def createSymbolTable(self, constTable):
         symTable = {}
+        gradientTable = {} # color
         for const in constTable.keys():
             node = DFGNode()
             node.operation = const
+            node.dataType = 'constant'
             self.dfg.add(node)
             self.connectNode(self.dfg.get(0), node)
             symTable[const] = node
@@ -410,6 +432,10 @@ class DFGGenerator:
                         gradVar = link[0]
                         modelVar = link[1]
                         self.linkTable[gradVar] = modelVar
+                        gradKey = gradVar[:gradVar.find('[')] #color
+                        print(gradKey)
+                        gradientTable[gradKey] = True #color
+                        print('debug', gradientTable)
                 else: # means either model_input, model_output, or model
                     # Array of vars.  ex. ['#1[#0]', '#2[#0]']
                     for d in x:
@@ -417,6 +443,7 @@ class DFGGenerator:
                             symTable[d] = 0;
                             node = DFGNode()
                             node.operation = d
+                            node.dataType = dataType.getChild(0).getText()
                             self.dfg.add(node)
                             self.connectNode(self.dfg.get(0), node)
                             symTable[d] = node
@@ -437,6 +464,7 @@ class DFGGenerator:
                                         stringKeyTwo = stringKey + '[' + str(j) + ']'
                                         node = DFGNode()
                                         node.operation = stringKeyTwo
+                                        node.dataType = dataType.getChild(0).getText()
                                         self.dfg.add(node)
                                         self.connectNode(self.dfg.get(0), node)
                                         symTable[stringKeyTwo] = node
@@ -444,10 +472,12 @@ class DFGGenerator:
                                 else:
                                     node = DFGNode()
                                     node.operation = stringKey
+                                    node.dataType = dataType.getChild(0).getText()
                                     self.dfg.add(node)
                                     self.connectNode(self.dfg.get(0), node)
                                     symTable[stringKey] = node
-        return symTable
+        print('after createSymbolTable()...', gradientTable)
+        return (symTable, gradientTable)
 
     def createFuncTypeTable(self):
         x = {}
