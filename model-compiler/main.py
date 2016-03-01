@@ -1,46 +1,41 @@
 from antlr4 import *
 
-import sys
+import sys, os
 
 from TablaLexer import TablaLexer
 from TablaParser import TablaParser
-from treewalker import ProgramPrinter
 from DFGGenerator import DFGGenerator
 from DotGenerator import DotGenerator
 from Scheduler import Scheduler
 
 def main(argv):
-    input = FileStream(argv[1])
+    input = FileStream(argv)
     lexer = TablaLexer(input)
     stream = CommonTokenStream(lexer)
     parser = TablaParser(stream)
     tree = parser.program()   ### program is the starting rule. The parser is invoked by calling the starting rule.
     
-    '''
-    printer = ProgramPrinter()
-    walker = ParseTreeWalker()
-    walker.walk(printer, tree) ## after this, we have SSA parse tree
-    '''
-
     # graph creation should happen here
     print('\n\n================================')
     dfgGenerator = DFGGenerator()
     dfg = dfgGenerator.create(tree)
-    dfgGenerator.writeTo(dfg, './dfg.json')
+    dfg_file = './dfg_' + os.path.basename(argv)[:-2] + '.json'
+    dfgGenerator.writeTo(dfg, dfg_file)
 
-    # scheduler = Scheduler(dfg)
-    # schedule = scheduler.createSchedule(16)
     scheduler = Scheduler()
-    newDfg = scheduler.readFrom('./dfg.json')
+    newDfg = scheduler.readFrom(dfg_file)
     scheduler.createSchedule(newDfg, 16)
-    scheduler.writeTo('./schedule.json')
+    schedule_file = './schedule_' + os.path.basename(argv)[:-2] + '.json'
+    scheduler.writeTo(schedule_file)
 
     dotGenerator = DotGenerator()
-    newDfg = dotGenerator.readFrom('./dfg.json')
-    cycle2id = dotGenerator.readSched('./schedule.json')
+    newDfg = dotGenerator.readFrom(dfg_file)
+    cycle2id = dotGenerator.readSched(schedule_file)
     dotCode = dotGenerator.generateDot(newDfg, cycle2id)
-    dotGenerator.writeTo(dotCode, './tabla.dot')
+    dot_file = './dot_' + os.path.basename(argv)[:-2] + '_cycle.dot'
+    dotGenerator.writeTo(dotCode, dot_file)
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    for filename in sys.argv[1:]:
+        main(filename)
