@@ -10,7 +10,7 @@ iterator i[0:m];
 
 h = sum[i](w[i] * x[i]);
 c = y * h;
-co = (c > 1) * (1 - c)
+//co = (c > 1) * (1 - c)
 g[i] = ((c > 1) * (0-y)) * x[i];
 
 // SGD added
