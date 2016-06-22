@@ -35,7 +35,7 @@ $ java -cp "/usr/local/lib/antlr-4.5-complete.jar:$CLASSPATH" org.antlr.v4.Tool 
 If you would like to see the lexer tokens, run:
 
 ```
-$ python3 pygrun.py Tabla program --tokens TEST_FILE
+$ python3 pygrun.py Tabla program --tokens TEST_FILE.t
 ```  
 
 ### Developers

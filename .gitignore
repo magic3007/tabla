@@ -1,4 +1,5 @@
 __pycache__/
+.DS_Store
 serial/__pycache__/
 ssa.txt
 dfg.json
@@ -9,3 +10,5 @@ tabla.ps
 clean.sh
 schedule.json
 tabla.jpeg
+*.json
+*.dot
