@@ -1,7 +1,7 @@
 mu = 1;
-m = 5; // num of movies
-n = 4; // num of users
-k = 3; // num of features
+m = 3; // num of movies
+n = 3; // num of users
+k = 2; // num of features
 
 model_input x1[k]; //it is from the movies-feature model
 model_input x2[k]; //it is from the users-feature model

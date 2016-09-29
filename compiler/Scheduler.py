@@ -23,6 +23,7 @@ class Scheduler:
         dfg.remove(source)
         dfg.remove(sink)
         for node in source.children:
+            self.schedule[cycle].append(node.id)
             dfg.remove(node)
         self.sortDFGByDist2sink(dfg)
         # source = dfg.get(dfg.getSize() - 1)

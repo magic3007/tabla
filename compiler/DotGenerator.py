@@ -94,11 +94,13 @@ class DotGenerator:
         rankCode += rankSource
 
         # srcImmChildren is a list of id's of source's immediate children
+        '''
         sameRankIds = ''
         for id in srcImmChildren:
             sameRankIds += '"' + str(id) + '"' + '; '
         rankTempl = '{rank = same; ' + sameRankIds + '};\n'
         rankCode += rankTempl
+        '''
         
         # cycle2id is a dictionary of cycle to node id list
         for cycle in cycle2id:
