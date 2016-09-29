@@ -1,0 +1,13 @@
+#pe_namespace_wrapper
+pe
+#accelerator
+#pu
+#tabla_wrapper
+#axi_master
+#axi_slave
+#pe_namespace
+#mem_interface
+#pe_compute
+#shifter
+#loopback
+#weight_read

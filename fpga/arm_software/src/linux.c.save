@@ -1,0 +1,87 @@
+:q
+uuq#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <sys/mman.h>
+#include "xil_types.h"
+
+#define AXI_GP0_MASTER_BASE_ADDR 0x43C00000
+#define AXI_HP0_RD_BASE_ADDR     0x00000000
+#define AXI_HP0_WR_BASE_ADDR     0x02000000
+
+#define TEST_VEC_LEN    64
+
+int main()
+{
+  int dh = open("/dev/mem", O_RDWR | O_SYNC); // Open /dev/mem which represents the whole physical memory
+  u32* control_master = mmap(NULL, 65535, PROT_READ | PROT_WRITE, MAP_SHARED, dh, AXI_GP0_MASTER_BASE_ADDR); // Memory map AXI Lite register block
+  u16* rd_address  = mmap(NULL, 65535, PROT_READ | PROT_WRITE, MAP_SHARED, dh, AXI_HP0_RD_BASE_ADDR); // Memory map source address
+  u16* wr_address = mmap(NULL, 65535, PROT_READ | PROT_WRITE, MAP_SHARED, dh, AXI_HP0_WR_BASE_ADDR); // Memory map destination address
+
+  u16 i;
+	for (i=0; i<TEST_VEC_LEN; i++) {
+		*(wr_address+i) = 1;
+	}
+	printf("    Done!\n\r ");
+
+  printf ("Initializing Read location\n\r ");
+  for (i=0; i<TEST_VEC_LEN; i++) {
+	  *(rd_address+i) = i;
+    printf("Address: %6x\tData: %6d\n\r ", rd_address+i, *(rd_address+i));
+  }
+	printf("    Done!\n\r ");
+  printf ("Initializing Write location\n\r ");
+  for (i=0; i<TEST_VEC_LEN; i++) {
+	  *(wr_address+i) = -1;
+  }
+	printf("    Done!\n\r ");
+
+	printf("Invoking the accelerator\n\r ");
+	*(control_master+0) = 0x00000001;
+	printf("Waiting for the accelerator to finish processing\n\r ");
+	sleep(1);
+	while (*(control_master+1) != 1) {
+		sleep(5);
+	}
+
+  printf ("Read_finished: %d\n\r ", *(control_master+2));
+  printf ("processing_finished: %d\n\n\r ", *(control_master+3));
+  printf ("total_cycles : %d\n\r ", *(control_master+4));
+  printf ("rd_cycles    : %d\n\r ", *(control_master+5));
+  printf ("pr_cycles    : %d\n\r ", *(control_master+6));
+  printf ("wr_cycles    : %d\n\r ", *(control_master+7));
+
+	printf("    Done!\n\r ");
+  printf("Verifying results \n\r ");
+  u16 count = 0;
+
+  printf ("Expected output:\n\r ");
+	for (i=0; i<TEST_VEC_LEN; i++) {
+    printf("Address: %6x\tData: %6d\n\r ", wr_address+i, *(rd_address+i));
+	}
+  printf("\n\r ");
+
+  printf ("Received output:\n\r ");
+	for (i=0; i<TEST_VEC_LEN; i++) {
+    printf("Address: %6x\tData: %6d\n\r ", wr_address+i, *(wr_address+i));
+    count += *(rd_address+i) != *(wr_address+i);
+	}
+  printf("\n\r ");
+
+  if (count > 0) {
+      printf ("Results : Failed\n\r ");
+  }
+  else {
+      printf ("Results : Passed\n\r ");
+  }
+    printf ("total_cycles : %d\n\r ", *(control_master+4));
+    printf ("rd_cycles    : %d\n\r ", *(control_master+5));
+    printf ("pr_cycles    : %d\n\r ", *(control_master+6));
+    printf ("wr_cycles    : %d\n\r ", *(control_master+7));
+	printf ("==================================================\n\r ");
+
+  printf("Hello World\n");
+  return 0;
+}
+
