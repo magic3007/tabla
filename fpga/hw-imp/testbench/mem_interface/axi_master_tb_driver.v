@@ -17,7 +17,7 @@ module axi_master_tb_driver
    parameter integer C_M_AXI_RD_BURST_LEN     = 16,
    parameter integer C_M_AXI_WR_BURST_LEN     = 4,
    parameter integer TX_SIZE_WIDTH            = 10,
-   parameter integer VERBOSITY                = 2,
+   parameter integer VERBOSITY                = 3,
    parameter integer NUM_AXI                  = 1,
    parameter integer DATA_WIDTH               = 8
 // ******************************************************************
@@ -393,6 +393,7 @@ task automatic request_random_tx;
     begin
         read_counter = 0;
         wait(ARESETN);
+        @(negedge ACLK);
         rx_req = 1'b1;
         rx_req_size = $random+1;
         rx_addr = $random & 32'hFFFFFF00;

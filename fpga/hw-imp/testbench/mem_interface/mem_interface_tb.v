@@ -9,14 +9,29 @@ module mem_interface_tb;
     parameter integer DATA_WIDTH        = 16;
     parameter integer NUM_DATA          = AXI_DATA_WIDTH*NUM_AXI/DATA_WIDTH;
     parameter integer NUM_PE            = 64;
-    parameter integer VERBOSITY         = 3;
+    parameter integer VERBOSITY         = 2;
     parameter integer NAMESPACE_WIDTH   = 2;
-    parameter integer TX_SIZE_WIDTH     = 5;
+    parameter integer TX_SIZE_WIDTH     = 10;
 // ******************************************************************
 
 // ******************************************************************
 // Localparams
 // ******************************************************************
+    localparam integer STATE_IDLE           = 0;
+
+    localparam integer WEIGHT_READ          = 1;
+    localparam integer WEIGHT_READ_WAIT     = 2;
+
+    localparam integer DATA_READ            = 3;
+    localparam integer DATA_READ_WAIT       = 4;
+
+    localparam integer STATE_COMPUTE        = 5;
+
+    localparam integer WEIGHT_WRITE         = 6;
+    localparam integer WEIGHT_WRITE_WAIT    = 7;
+
+    localparam integer WEIGHT_COUNTER_WIDTH = 16;
+
     localparam integer WSTRB_WIDTH          = {(RD_BUF_DATA_WIDTH/8){1'b1}} * NUM_AXI;
 
     localparam integer RD_BUF_DATA_WIDTH    = DATA_WIDTH * NUM_DATA / NUM_AXI;
@@ -61,6 +76,10 @@ module mem_interface_tb;
 
     integer                         i;
     integer                         n;
+
+    integer                         pe_read_count_expected [ 0 : NUM_PE-1 ];
+    integer                         pe_read_count_real     [ 0 : NUM_PE-1 ];
+    //integer                         pe_write_count [ 0 : NUM_PE-1 ];
 
     wire [32*NUM_AXI-1:0]           S_AXI_ARADDR;
     wire [2*NUM_AXI-1:0]            S_AXI_ARBURST;
@@ -120,7 +139,7 @@ module mem_interface_tb;
     wire [NUM_AXI-1:0]              rx_req;
     wire [NUM_AXI*TX_SIZE_WIDTH-1:0]rx_req_size;
     wire [NUM_AXI-1:0]              rx_done;
-
+    wire [NUM_AXI*32-1:0]           rx_addr;
 
     reg                             start;
 
@@ -193,7 +212,8 @@ begin : AXI_DRIVERS
         .inBuf_full                 ( inBuf_full[gen+:1]        ),
         .rx_req                     ( rx_req[gen+:1]            ),
         .rx_req_size                ( rx_req_size[TX_SIZE_WIDTH*gen+:TX_SIZE_WIDTH]               ),
-        .rx_done                    ( rx_done[gen+:1]           )
+        .rx_addr                    ( rx_addr[gen*32+:32]                   ),
+        .rx_done                    ( rx_done[gen]           )
     );
 end
 // ******************************************************************
@@ -201,14 +221,14 @@ end
 // ******************************************************************
 // DUT - MEM Interface
 // ******************************************************************
-mem_interface #(
+  mem_interface #(
     .DATA_WIDTH             ( DATA_WIDTH            ),
     .RD_BUF_ADDR_WIDTH      ( RD_BUF_ADDR_WIDTH     ),
     .NUM_DATA               ( NUM_DATA              ),
     .NUM_PE                 ( NUM_PE                ),
     .NUM_AXI                ( NUM_AXI               ),
     .TX_SIZE_WIDTH          ( TX_SIZE_WIDTH         )
-) u_mem_if (
+  ) u_mem_if (
     .ACLK                   ( ACLK                  ), //input
     .ARESETN                ( ARESETN               ), //input
     .compute_start          ( compute_start         ), //output
@@ -217,7 +237,9 @@ mem_interface #(
     .DATA_INOUT_WB          ( DATA_INOUT_WB         ), //input
     .EOI                    ( EOI                   ), //input
     .EOC                    ( EOC                   ), //input
+    .CTRL_PE                ( ctrl_pe               ), //output
     .start                  ( start                 ), //input
+    .DATA_IO_DIR            ( DATA_IO_DIR           ), //output
 
     .S_AXI_ARADDR           ( S_AXI_ARADDR          ), //output
     .S_AXI_ARBURST          ( S_AXI_ARBURST         ), //output
@@ -261,12 +283,13 @@ mem_interface #(
     .S_AXI_WLAST            ( S_AXI_WLAST           ), //output
     .S_AXI_WREADY           ( S_AXI_WREADY          ), //input
     .S_AXI_WSTRB            ( S_AXI_WSTRB           ), //output
-    .S_AXI_WVALID           ( S_AXI_WVALID          ), //output
+    .S_AXI_WVALID           ( S_AXI_WVALID          )  //output
 
-    .rx_req                 ( rx_req[0]             ), //input
-    .rx_req_size            ( rx_req_size[TX_SIZE_WIDTH-1:0]           ), //input
-    .rx_done                ( rx_done[0]            )  //output
-);
+    //.rx_req                 ( rx_req                ), //input
+    //.rx_req_size            ( rx_req_size           ), //input
+    //.rx_done                ( rx_done               ), //output
+    //.rx_addr                ( rx_addr               )  //input
+  );
 // ******************************************************************
 
 
@@ -275,8 +298,18 @@ task test_main;
     begin
         repeat(20) begin
             AXI_DRIVERS[0].u_axim_driver.request_random_tx;
+            $display ("AXI 0 done");
+            AXI_DRIVERS[1].u_axim_driver.request_random_tx;
+            $display ("AXI 1 done");
+            AXI_DRIVERS[2].u_axim_driver.request_random_tx;
+            $display ("AXI 2 done");
+            AXI_DRIVERS[3].u_axim_driver.request_random_tx;
+            $display ("AXI 3 done");
         end
         AXI_DRIVERS[0].u_axim_driver.check_fail;
+        AXI_DRIVERS[1].u_axim_driver.check_fail;
+        AXI_DRIVERS[2].u_axim_driver.check_fail;
+        AXI_DRIVERS[3].u_axim_driver.check_fail;
         //AXI_DRIVERS[0].u_axim_driver.test_pass;
     end
 endtask
@@ -311,69 +344,87 @@ end
 //--------------------------------------------------------------------------------------
 task rand_instruction;
   input integer num_ins;
-    reg  [CTRL_PE_WIDTH-1:0]        ctrl_pe;
-    reg  [OP_CODE_WIDTH-1:0]        ctrl_op_code;
-    reg  [SHIFTER_CTRL_WIDTH-1:0]   ctrl_shifter;
-    reg  [CTRL_BUF_DATA_WIDTH-1:0]  ctrl_buf_data_in;
-    reg [DATA_WIDTH-1:0]  rd_data_addr;
-    integer expected_data_addr;
-    reg [RD_IF_DATA_WIDTH-1:0] tmp;
+  reg  [CTRL_PE_WIDTH-1:0]        ctrl_pe;
+  reg  [OP_CODE_WIDTH-1:0]        ctrl_op_code;
+  reg  [SHIFTER_CTRL_WIDTH-1:0]   ctrl_shifter;
+  reg  [CTRL_BUF_DATA_WIDTH-1:0]  ctrl_buf_data_in;
+  reg  [DATA_WIDTH-1:0]           rd_data_addr;
+  integer                         expected_data_addr;
+  reg  [RD_IF_DATA_WIDTH-1:0]     tmp;
+  integer n, m, pe_id;
+  begin
+    expected_data_addr = 0;
+    rd_data_addr = 0;
+    for (n=0; n<NUM_PE; n=n+1)
     begin
-      expected_data_addr = 0;
-      rd_data_addr = 0;
-        for (n=0; n<num_ins; n=n+1)
-        begin
-            if (n > 0)
-            begin
-                ctrl_pe       = {$random, $random};
-                ctrl_op_code  = {$random, $random} % 3;
-                ctrl_shifter  = {$random, $random};
-                case (ctrl_op_code)
-                  0:begin
-                    rd_data_addr = rd_data_addr + 1;
-                  end
-                  1:begin
-                    tmp = {
-                      (rd_data_addr << 2) + 2'h3, 
-                      (rd_data_addr << 2) + 2'h2, 
-                      (rd_data_addr << 2) + 2'h1, 
-                      (rd_data_addr << 2) + 2'h0,
-                      (rd_data_addr << 2) + 2'h3, 
-                      (rd_data_addr << 2) + 2'h2, 
-                      (rd_data_addr << 2) + 2'h1, 
-                      (rd_data_addr << 2) + 2'h0,
-                      (rd_data_addr << 2) + 2'h3, 
-                      (rd_data_addr << 2) + 2'h2, 
-                      (rd_data_addr << 2) + 2'h1, 
-                      (rd_data_addr << 2) + 2'h0,
-                      (rd_data_addr << 2) + 2'h3, 
-                      (rd_data_addr << 2) + 2'h2, 
-                      (rd_data_addr << 2) + 2'h1, 
-                      (rd_data_addr << 2) + 2'h0
-                      };
-                    expected_data_ram[expected_data_addr] = {tmp, tmp, tmp} >> ctrl_shifter*DATA_WIDTH;
-                    //$display ("Expected Data : %h", expected_data_ram[expected_data_addr]);
-                    expected_data_addr = expected_data_addr + 1;
-                  end
-                  default:begin
-                  end
-                endcase
-            end
-            else begin
-                ctrl_pe       = {$random, $random};
-                ctrl_op_code  = 0;
-                ctrl_shifter  = {$random, $random};
-            end
-            if (VERBOSITY > 2) $display ("ADDR: %h, OP_CODE = %h", n, ctrl_op_code);
-            ctrl_buf_data_in = {ctrl_pe, ctrl_op_code, ctrl_shifter};
-            mem_interface_tb.u_mem_if.u_if_controller.u_ctrl_buf.mem[n] = ctrl_buf_data_in;
-        end
-        ctrl_pe       = {$random, $random};
-        ctrl_op_code  = 2;
-        ctrl_shifter  = {$random, $random};
-        ctrl_buf_data_in = {ctrl_pe, ctrl_op_code, ctrl_shifter};
-        mem_interface_tb.u_mem_if.u_if_controller.u_ctrl_buf.mem[num_ins] = ctrl_buf_data_in;
+      pe_read_count_expected[n] = 0;
+      pe_read_count_real[n] = 0;
+      //pe_write_count[n] = 0;
     end
+    for (n=0; n<num_ins; n=n+1)
+    begin
+      if (n > 0)
+      begin
+        ctrl_pe       = {$random, $random};
+        ctrl_op_code  = {$random, $random} % 3;
+        ctrl_shifter  = {$random, $random};
+        case (ctrl_op_code)
+          0:begin
+            rd_data_addr = rd_data_addr + 1;
+          end
+          1:begin
+            tmp = {
+              (rd_data_addr << 2) + 2'h3, 
+              (rd_data_addr << 2) + 2'h2, 
+              (rd_data_addr << 2) + 2'h1, 
+              (rd_data_addr << 2) + 2'h0,
+              (rd_data_addr << 2) + 2'h3, 
+              (rd_data_addr << 2) + 2'h2, 
+              (rd_data_addr << 2) + 2'h1, 
+              (rd_data_addr << 2) + 2'h0,
+              (rd_data_addr << 2) + 2'h3, 
+              (rd_data_addr << 2) + 2'h2, 
+              (rd_data_addr << 2) + 2'h1, 
+              (rd_data_addr << 2) + 2'h0,
+              (rd_data_addr << 2) + 2'h3, 
+              (rd_data_addr << 2) + 2'h2, 
+              (rd_data_addr << 2) + 2'h1, 
+              (rd_data_addr << 2) + 2'h0
+              };
+            expected_data_ram[expected_data_addr] = {tmp, tmp, tmp} >> ctrl_shifter*DATA_WIDTH;
+            $display ("Expected Data : %h", expected_data_ram[expected_data_addr]);
+            expected_data_addr = expected_data_addr + 1;
+          end
+          default:begin
+          end
+        endcase
+      end
+      else begin
+        ctrl_pe       = {$random, $random};
+        ctrl_op_code  = 0;
+        ctrl_shifter  = {$random, $random};
+      end
+      if (VERBOSITY > 2) $display ("ADDR: %h, OP_CODE = %h", n, ctrl_op_code);
+      for (m=0; m<NUM_DATA; m=m+1)
+      begin
+        if (ctrl_pe[NAMESPACE_WIDTH+(3)*m+:1] && ctrl_op_code == 1)
+        begin
+          pe_id = (m<<2)+ctrl_pe[NAMESPACE_WIDTH+(3)*m+1+:2];
+          if (VERBOSITY > 2) $display ("Lane %d, PE_ID %d", m, pe_id);
+          pe_read_count_expected[pe_id] = pe_read_count_expected[pe_id] + 1;
+        end
+      end
+      ctrl_pe[NAMESPACE_WIDTH-1:0] = `NAMESPACE_MEM_DATA;
+      ctrl_buf_data_in = {ctrl_pe, ctrl_op_code, ctrl_shifter};
+      mem_interface_tb.u_mem_if.u_if_controller.u_ctrl_buf.mem[n] = ctrl_buf_data_in;
+    end
+    ctrl_pe       = {$random, $random};
+    ctrl_op_code  = 2;
+    ctrl_shifter  = {$random, $random};
+    ctrl_pe[NAMESPACE_WIDTH-1:0] = `NAMESPACE_MEM_DATA;
+    ctrl_buf_data_in = {ctrl_pe, ctrl_op_code, ctrl_shifter};
+    mem_interface_tb.u_mem_if.u_if_controller.u_ctrl_buf.mem[num_ins] = ctrl_buf_data_in;
+  end
 endtask
 //--------------------------------------------------------------------------------------
 
@@ -411,20 +462,21 @@ begin
   ARESETN = 1;
   @(negedge ACLK);
   ARESETN = 0;
+  set_weight_reads;
   @(negedge ACLK);
   ARESETN = 1;
 
   @(negedge ACLK);
 
-  test_main;
+  //test_main;
 
-  $display("%c[1;32m",27);
-  $display ("Test Passed");
-  $display("%c[0m",27);
+  //$display("%c[1;32m",27);
+  //$display ("Test Passed");
+  //$display("%c[0m",27);
 
-  #10000;
-  check_fail;
-  $finish;
+  //#10000;
+  //check_fail;
+  //$finish;
 end
 
 initial begin
@@ -435,15 +487,49 @@ initial begin
 end
 
 wire [2:0] state = mem_interface_tb.u_mem_if.u_if_controller.state;
+reg [16-1:0] a;
+integer pe_id_count;
 initial
 begin
   rand_instruction(100);
   $display ("Testing random instructions");
   wait(num_instructions == 100);
   wait (state == 0);
+  for (pe_id_count = 0; pe_id_count < NUM_PE; pe_id_count = pe_id_count + 1)
+  begin
+    if (pe_read_count_expected[pe_id_count] !== pe_read_count_real[pe_id_count]) begin
+      fail_flag = 1;
+    end
+  end
   @(negedge ACLK);
+  check_fail;
+
+  check_weight_reads;
+  check_fail;
+
+  $display("%c[1;32m",27);
+  $display ("**************************************************");
+  $display ("Test Passed");
+  $display ("**************************************************");
+  $display("%c[0m",27);
   $finish;
 end
+
+task check_weight_reads;
+  begin
+    for (pe_id_count = 0; pe_id_count < NUM_PE; pe_id_count = pe_id_count + 1)
+    begin
+      a = (mem_interface_tb.u_mem_if.u_if_controller.counter_init[pe_id_count >> 2] >> (16*(pe_id_count%4))) & 64'hFFFF;
+      if (weight_read_count[pe_id_count] !== a)
+      begin
+        $display ("PE_ID = %d, Weight Reads = %d, Expected Weight Reads = %d", 
+          pe_id_count, weight_read_count[pe_id_count], a);
+        fail_flag = 1;
+        check_fail;
+      end
+    end
+  end
+endtask
 
 always #1 ACLK = ~ACLK;
 
@@ -465,9 +551,19 @@ begin
 end
 
 task check_shifter_output;
+  integer n, m, pe_id;
+  reg valid;
+  reg [1:0] namespace;
   begin
+    // for (n=0; n<NUM_DATA; n=n+1)
+    // begin
+    //   pe_id = (n<<2)+ctrl_pe[NAMESPACE_WIDTH+(3)*n+1+:2];
+    //   valid = ctrl_pe[NAMESPACE_WIDTH+(3)*n+:1];
+    //   if (valid) $display ("state = %d PE ID = %d", state, pe_id);
+    // end
+    namespace = ctrl_pe[NAMESPACE_WIDTH-1:0];
     @(negedge ACLK);
-    if (wdata !== expected_data_ram[addr]) begin
+    if (wdata !== expected_data_ram[addr] && namespace == `NAMESPACE_MEM_DATA) begin
       $display ("Got Data      : %h", wdata);
       $display ("Expected Data : %h", expected_data_ram[addr]);
       fail_flag = 1;
@@ -476,7 +572,39 @@ task check_shifter_output;
       $display ("Got Data      : %h", wdata);
       $display ("Expected Data : %h", expected_data_ram[addr]);
     end
-    addr = addr + 1;
+    if (namespace == `NAMESPACE_MEM_DATA) addr = addr + 1;
+    // for (n=0; n<NUM_DATA; n=n+1)
+    // begin
+    //   pe_id = (n<<2)+ctrl_pe[NAMESPACE_WIDTH+(3)*n+1+:2];
+    //   valid = ctrl_pe[NAMESPACE_WIDTH+(3)*n+:1];
+    //   if (valid) $display ("state = %d PE ID = %d", state, pe_id);
+    // end
+  end
+endtask
+
+always @(posedge ACLK)
+begin
+  count_pe_reads;
+end
+
+task count_pe_reads;
+  integer n, m, pe_id;
+  reg valid;
+  reg [1:0] namespace;
+  if (ctrl_pe[NAMESPACE_WIDTH-1:0] == `NAMESPACE_MEM_DATA)
+  begin
+    if (VERBOSITY > 2) $display ("--");
+    for (n=0; n<NUM_DATA; n=n+1)
+    begin
+      pe_id = (n<<2)+ctrl_pe[NAMESPACE_WIDTH+(3)*n+1+:2];
+      valid = ctrl_pe[NAMESPACE_WIDTH+(3)*n+:1];
+      if (valid) begin
+        pe_read_count_real[pe_id] = pe_read_count_real[pe_id] + 1;
+        if (VERBOSITY > 2) $display ("PE_ID - %d, Expected Reads = %d, Actual = %d",
+          pe_id, pe_read_count_expected[pe_id], pe_read_count_real[pe_id]);
+      end
+    end
+    if (VERBOSITY > 2) $display ("--");
   end
 endtask
 
@@ -503,7 +631,52 @@ task compute;
   end
 endtask
 
-// ******************************************************************
+integer weight_read_count [ NUM_PE-1 : 0 ];
 
+initial begin
+end
+
+always @(posedge ACLK)
+begin
+  if (ARESETN == 0 || (shifter_rd_en && ctrl_pe[NAMESPACE_WIDTH-1:0] == `NAMESPACE_MEM_WEIGHT && DATA_IO_DIR == 0))
+  begin
+    count_weight_reads;
+  end
+end
+
+task set_weight_reads;
+  begin
+    for (i=0; i<NUM_PE; i=i+1)
+    begin
+      //mem_interface_tb.u_mem_if.u_if_controller.counter_init[i] = {16'd16, 16'd9, 16'd6, 16'd8};
+      mem_interface_tb.u_mem_if.u_if_controller.counter_init[i] = {$random & 32'h00FF00FF, $random & 32'h00FF00FF};
+    end
+  end
+endtask
+
+task count_weight_reads;
+  integer n, pe_id;
+  reg valid;
+  begin
+    if (ARESETN == 0)
+    begin
+      for (n=0; n<NUM_PE; n=n+1)
+      begin
+        weight_read_count[n] = 0;
+      end
+    end
+    for (n=0; n<NUM_DATA; n=n+1)
+    begin
+      pe_id = (n<<2)+ctrl_pe[NAMESPACE_WIDTH+(3)*n+1+:2];
+      valid = ctrl_pe[NAMESPACE_WIDTH+(3)*n+:1];
+      if (valid)
+      begin
+        weight_read_count[pe_id] = weight_read_count[pe_id] + 1;
+      end
+    end
+  end
+endtask
+
+// ******************************************************************
 
 endmodule

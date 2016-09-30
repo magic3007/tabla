@@ -13,26 +13,36 @@ module read_if_control
     parameter integer NUM_PE                = 64,
     parameter integer NAMESPACE_WIDTH       = 2,
     parameter         CTRL_BUF_INIT         = "hw-imp/include/mem-data-rom.txt",
-    parameter         WEIGHT_CTRL_INIT      = "hw-imp/include/mem-weight-rom.txt"
+    parameter         WEIGHT_CTRL_INIT      = "hw-imp/include/mem-weight-rom.txt",
+    parameter integer TX_SIZE_WIDTH         = 10,
+    parameter integer NUM_AXI               = 4
 // ******************************************************************
 ) (
 // ******************************************************************
 // IO
 // ******************************************************************
-    input  wire                             ACLK,
-    input  wire                             ARESETN,
+    input  wire                             clk,
+    input  wire                             resetn,
     input  wire                             start,
     output wire                             compute_start,
-    input  wire                             RD_BUF_EMPTY,
-    output wire                             RD_BUF_POP,
-    input  wire                             WR_BUF_FULL,
-    output wire                             WR_BUF_PUSH,
-    output wire                             SHIFTER_RD_EN,
-    output wire                             DATA_IO_DIR,
-    input  wire                             EOI,
-    input  wire                             EOC,
-    output wire [CTRL_PE_WIDTH-1:0]         CTRL_PE,
-    output wire [SHIFTER_CTRL_WIDTH-1:0]    SHIFT
+    input  wire                             rd_buf_empty,
+    output wire                             rd_buf_pop,
+    input  wire                             wr_buf_full,
+    output wire                             wr_buf_push,
+    output wire                             shifter_rd_en,
+    output wire                             data_io_dir,
+    input  wire                             eoi,
+    input  wire                             eoc,
+    output wire [CTRL_PE_WIDTH-1:0]         ctrl_pe,
+    output wire [SHIFTER_CTRL_WIDTH-1:0]    shift,
+    output wire [TX_SIZE_WIDTH-1:0]         rx_req_size,
+    output wire                             rx_req,
+    output wire [NUM_AXI*32-1:0]            rx_addr,
+    //Configuration registers from AXI
+    input  wire [32-1:0]                    weight_read_addr,
+    input  wire [32-1:0]                    weight_write,
+    input  wire [32-1:0]                    data_read_addr,
+    input  wire [32-1:0]                    num_iterations
 // ******************************************************************
 );
 
@@ -83,7 +93,6 @@ module read_if_control
     reg  [CTRL_BUF_ADDR_WIDTH-1:0]  ctrl_buf_addr;
     reg                             ctrl_buf_read_en;
 
-    wire [CTRL_PE_WIDTH-1:0]        ctrl_pe;
     wire [SHIFTER_CTRL_WIDTH-1:0]   ctrl_shifter;
 
     reg  [STATE_WIDTH-1:0]          state;
@@ -96,6 +105,10 @@ module read_if_control
     reg  [SHIFTER_CTRL_WIDTH-1:0]   shift_reg;
     reg  [OP_CODE_WIDTH-1:0]        ctrl_op_code;
     reg  [OP_CODE_WIDTH-1:0]        ctrl_op_code_d;
+
+    reg                             rx_req_reg;
+    reg  [TX_SIZE_WIDTH-1:0]        rx_req_size_reg;
+    reg  [NUM_AXI*32-1:0]           rx_addr_reg;
 
 // ******************************************************************
 
@@ -137,7 +150,6 @@ module read_if_control
       assign ctrl_pe_weight_read [NAMESPACE_WIDTH + gen*(PE_ID_WIDTH+1)+:PE_ID_WIDTH+1] = {pe_id_weight_read, valid_weight_read};
       assign ctrl_pe_weight_write[NAMESPACE_WIDTH + gen*(PE_ID_WIDTH+1)+:PE_ID_WIDTH+1] = {pe_id_weight_write, valid_weight_write};
 
-
       reg  [WEIGHT_COUNTER_WIDTH-1:0] counter_0;
       reg  [WEIGHT_COUNTER_WIDTH-1:0] counter_1;
       reg  [WEIGHT_COUNTER_WIDTH-1:0] counter_2;
@@ -153,9 +165,9 @@ module read_if_control
       assign counter_2_init = counter_init[gen][WEIGHT_COUNTER_WIDTH*2+:WEIGHT_COUNTER_WIDTH];
       assign counter_3_init = counter_init[gen][WEIGHT_COUNTER_WIDTH*3+:WEIGHT_COUNTER_WIDTH];
 
-      always @(posedge ACLK)
+      always @(posedge clk)
       begin
-        if (!ARESETN)
+        if (!resetn)
         begin
           counter_0 <= counter_0_init;
           counter_1 <= counter_1_init;
@@ -208,13 +220,17 @@ module read_if_control
     end
   endgenerate
 
-  always @(posedge ACLK)
+  always @(posedge clk)
   begin
     ctrl_op_code_d <= ctrl_op_code;
   end
 
-  assign CTRL_PE = ctrl_pe_reg;
-  assign SHIFT = shift_reg;
+  assign ctrl_pe = ctrl_pe_reg;
+  assign shift = shift_reg;
+
+  assign rx_req = rx_req_reg;
+  assign rx_addr = rx_addr_reg;
+  assign rx_req_size = rx_req_size_reg;
 
   always @( * )
   begin : DATA_RD_FSM
@@ -226,12 +242,19 @@ module read_if_control
     shift_reg = 0;
     ctrl_op_code = 0;
 
+    rx_req_reg = 0;
+    rx_addr_reg = 0;
+    rx_req_size_reg = 0;
+
     case (state)
 
       STATE_IDLE : begin
         if (start)
         begin
-          next_state = WEIGHT_READ;
+          next_state = WEIGHT_READ_WAIT;
+          rx_req_reg = 1;
+          rx_addr_reg = {weight_read_addr, weight_read_addr, weight_read_addr, weight_read_addr};
+          rx_req_size_reg = 128;
         end
       end
 
@@ -239,17 +262,21 @@ module read_if_control
         ctrl_pe_reg = ctrl_pe_weight_read;
         if (weight_read_done)
         begin
-          next_state = DATA_READ;
+          next_state = DATA_READ_WAIT;
           ctrl_buf_read_en = 1'b1;
+          rx_req_reg = 1;
+          //rx_addr_reg = 0;
+          rx_addr_reg = {data_read_addr, data_read_addr, data_read_addr, data_read_addr};
+          rx_req_size_reg = 128;
         end
-        else if (RD_BUF_EMPTY)
+        else if (rd_buf_empty)
         begin
           next_state = WEIGHT_READ_WAIT;
         end
       end
 
       WEIGHT_READ_WAIT: begin
-        if (!RD_BUF_EMPTY)
+        if (!rd_buf_empty)
         begin
           next_state = WEIGHT_READ;
         end
@@ -257,11 +284,13 @@ module read_if_control
 
       DATA_READ : begin
         {ctrl_pe_reg, ctrl_op_code, shift_reg} = ctrl_buf_data_out;
+        if (ctrl_op_code !== OP_SHIFT)
+          ctrl_pe_reg = 0;
         if (ctrl_op_code == OP_WFI)
         begin
           next_state = STATE_COMPUTE;
         end
-        else if (RD_BUF_EMPTY)
+        else if (rd_buf_empty)
         begin
           next_state = DATA_READ_WAIT;
         end
@@ -272,7 +301,7 @@ module read_if_control
       end
 
       DATA_READ_WAIT : begin
-        if (!RD_BUF_EMPTY)
+        if (!rd_buf_empty)
         begin
           next_state = DATA_READ;
           ctrl_buf_read_en = 1'b1;
@@ -280,14 +309,18 @@ module read_if_control
       end
 
       STATE_COMPUTE : begin
-        if (EOC)
+        if (eoc)
         begin
           next_state = WEIGHT_WRITE;
         end
-        else if (EOI)
+        else if (eoi)
         begin
-          next_state = DATA_READ;
-          ctrl_buf_read_en = 1'b1;
+          next_state = DATA_READ_WAIT;
+          //ctrl_buf_read_en = 1'b1;
+          rx_req_reg = 1;
+          //rx_addr_reg = 0;
+          rx_addr_reg = {data_read_addr, data_read_addr, data_read_addr, data_read_addr};
+          rx_req_size_reg = 128;
         end
       end
 
@@ -297,14 +330,14 @@ module read_if_control
         begin
           next_state = STATE_IDLE;
         end
-        else if (WR_BUF_FULL)
+        else if (wr_buf_full)
         begin
           next_state = WEIGHT_WRITE_WAIT;
         end
       end
 
       WEIGHT_WRITE_WAIT : begin
-        if (!WR_BUF_FULL)
+        if (!wr_buf_full)
         begin
           next_state = WEIGHT_WRITE;
         end
@@ -318,9 +351,9 @@ module read_if_control
 
   end
 
-  always @(posedge ACLK)
+  always @(posedge clk)
   begin
-      if (ARESETN)
+      if (resetn)
           state <= next_state;
       else
           state <= STATE_IDLE;
@@ -336,43 +369,43 @@ module read_if_control
     .ADDR_WIDTH     ( CTRL_BUF_ADDR_WIDTH   ),
     .TYPE           ( "BLOCK"               )
   ) u_ctrl_buf (
-    .CLK            ( ACLK                  ),
-    .RESET          ( !ARESETN              ),
+    .CLK            ( clk                  ),
+    .RESET          ( !resetn              ),
     .ADDRESS        ( ctrl_buf_addr         ),
     .ENABLE         ( ctrl_buf_read_en      ),
     .DATA_OUT       ( ctrl_buf_data_out     ),
     .DATA_OUT_VALID ( ctrl_buf_data_valid   )
   );
 
-  always @(posedge ACLK)
+  always @(posedge clk)
   begin
-    //if (!ARESETN || ctrl_buf_addr == CTRL_BUF_MAX_ADDR-1)
-    if (!ARESETN || state == STATE_IDLE || ctrl_op_code == OP_LOOP)
+    //if (!resetn || ctrl_buf_addr == CTRL_BUF_MAX_ADDR-1)
+    if (!resetn || state == STATE_IDLE || ctrl_op_code == OP_LOOP)
     begin
       ctrl_buf_addr <= 0;
     end
-    //else if (ARESETN && state == DATA_READ)
-    else if (ARESETN && ctrl_buf_read_en)
+    //else if (resetn && state == DATA_READ)
+    else if (resetn && ctrl_buf_read_en)
     begin
       ctrl_buf_addr <= ctrl_buf_addr + 1'b1;
     end
   end
 
   reg ctrl_buf_read_en_d;
-  always @(posedge ACLK)
+  always @(posedge clk)
     ctrl_buf_read_en_d <= ctrl_buf_read_en;
     
-  //assign {CTRL_PE, ctrl_op_code, SHIFT} = ctrl_buf_data_out;
-  //assign SHIFTER_RD_EN = (ctrl_op_code == OP_SHIFT) && ctrl_buf_data_valid;
-  //assign RD_BUF_POP = (ctrl_op_code == OP_READ) && ctrl_buf_data_valid && !RD_BUF_EMPTY;
-  assign SHIFTER_RD_EN = (ctrl_op_code == OP_SHIFT) && ctrl_buf_read_en_d;
-  assign RD_BUF_POP = (ctrl_op_code == OP_READ) && ctrl_buf_read_en_d && !RD_BUF_EMPTY;
-  assign DATA_IO_DIR = state == DATA_READ;
+  //assign {ctrl_pe, ctrl_op_code, shift} = ctrl_buf_data_out;
+  //assign shifter_rd_en = (ctrl_op_code == OP_SHIFT) && ctrl_buf_data_valid;
+  //assign rd_buf_pop = (ctrl_op_code == OP_READ) && ctrl_buf_data_valid && !rd_buf_empty;
+  assign shifter_rd_en = (state == WEIGHT_READ) || ((ctrl_op_code == OP_SHIFT) && ctrl_buf_read_en_d);
+  assign rd_buf_pop = (ctrl_op_code == OP_READ) && ctrl_buf_read_en_d && !rd_buf_empty;
+  assign data_io_dir = state == WEIGHT_WRITE;
 // ******************************************************************
 
 
 reg [STATE_WIDTH-1:0] prev_state;
-always @(posedge ACLK)
+always @(posedge clk)
 begin
   prev_state <= state;
 end

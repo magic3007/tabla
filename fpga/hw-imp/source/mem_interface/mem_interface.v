@@ -82,11 +82,32 @@ module mem_interface
     input  wire [2*NUM_AXI-1:0]             S_AXI_RRESP,
     input  wire [1*NUM_AXI-1:0]             S_AXI_RVALID,
 
-    // TXN REQ
-    input  wire                             rx_req,
-    input  wire [TX_SIZE_WIDTH-1:0]         rx_req_size,
-    output wire                             rx_done,
+    input  wire [31:0]                      M_AXI_GP0_awaddr,
+    input  wire [2:0]                       M_AXI_GP0_awprot,
+    input  wire                             M_AXI_GP0_awvalid,
+    output wire                             M_AXI_GP0_awready,
 
+    input  wire [31:0]                      M_AXI_GP0_wdata,
+    input  wire [3:0]                       M_AXI_GP0_wstrb,
+    input  wire                             M_AXI_GP0_wvalid,
+    output wire                             M_AXI_GP0_wready,
+
+    output wire [1:0]                       M_AXI_GP0_bresp,
+    output wire                             M_AXI_GP0_bvalid,
+    input  wire                             M_AXI_GP0_bready,
+
+    input  wire [31:0]                      M_AXI_GP0_araddr,
+    input  wire [2:0]                       M_AXI_GP0_arprot,
+    input  wire                             M_AXI_GP0_arvalid,
+    output wire                             M_AXI_GP0_arready,
+
+    output wire [31:0]                      M_AXI_GP0_rdata,
+    output wire [1:0]                       M_AXI_GP0_rresp,
+    output wire                             M_AXI_GP0_rvalid,
+    input  wire                             M_AXI_GP0_rready,
+
+
+    // TXN REQ
     input  wire                             start,
     output wire                             compute_start
 // ******************************************************************
@@ -113,6 +134,12 @@ module mem_interface
 // ******************************************************************
 // Local wires and regs
 // ******************************************************************
+
+    wire                            rx_req;
+    wire [TX_SIZE_WIDTH-1:0]        rx_req_size;
+    wire                            rx_done;
+    wire [NUM_AXI*32-1:0]           rx_addr;
+
     wire [RD_IF_DATA_WIDTH-1:0]     rd_buf_data_out;
     wire [NUM_AXI-1:0]              rd_buf_full;
     wire [NUM_AXI-1:0]              rd_buf_empty;
@@ -263,22 +290,26 @@ endgenerate
     #(
         .CTRL_BUF_ADDR_WIDTH    ( CTRL_BUF_ADDR_WIDTH   ),
         .NUM_DATA               ( NUM_DATA              ),
-        .NUM_PE                 ( NUM_PE                )
+        .NUM_PE                 ( NUM_PE                ),
+        .TX_SIZE_WIDTH          ( TX_SIZE_WIDTH         )
     ) u_if_controller (
-        .ACLK                   ( ACLK                  ),
-        .ARESETN                ( ARESETN               ),
-        .RD_BUF_EMPTY           ( |rd_buf_empty         ),
-        .RD_BUF_POP             ( rd_buf_pop            ),
-        .WR_BUF_FULL            ( |wr_buf_full          ),
-        .WR_BUF_PUSH            ( wr_buf_push           ),
-        .SHIFTER_RD_EN          ( shifter_rd_en         ),
+        .clk                   ( ACLK                  ),
+        .resetn                ( ARESETN               ),
+        .rd_buf_empty           ( |rd_buf_empty         ),
+        .rd_buf_pop             ( rd_buf_pop            ),
+        .wr_buf_full            ( |wr_buf_full          ),
+        .wr_buf_push            ( wr_buf_push           ),
+        .shifter_rd_en          ( shifter_rd_en         ),
         .start                  ( start                 ),
         .compute_start          ( compute_start         ),
-        .EOI                    ( EOI                   ),
-        .EOC                    ( EOC                   ),
-        .CTRL_PE                ( CTRL_PE               ),
-        .SHIFT                  ( shifter_ctrl_in       ),
-        .DATA_IO_DIR            ( DATA_IO_DIR           )
+        .eoi                    ( EOI                   ),
+        .eoc                    ( EOC                   ),
+        .ctrl_pe                ( CTRL_PE               ),
+        .shift                  ( shifter_ctrl_in       ),
+        .data_io_dir            ( DATA_IO_DIR           ),
+        .rx_req                 ( rx_req                ),
+        .rx_req_size            ( rx_req_size           ),
+        .rx_addr                ( rx_addr               )
     );
 // ******************************************************************
 
@@ -355,9 +386,61 @@ begin : AXI_MASTER
 
         .rx_req                     ( rx_req                    ),
         .rx_req_size                ( rx_req_size               ),
-        .rx_done                    ( rx_done_inst[gen+:1]      )
+        .rx_done                    ( rx_done_inst[gen*1+:1]    ),
+        .rx_addr                    ( rx_addr                   )
     );
 end
 // ******************************************************************
 
+//--------------------------------------------------------------
+//--------------------------------------------------------------
+axi4lite_slave #(
+    .AXIS_DATA_WIDTH        ( 32                  ),
+    .AXIS_ADDR_WIDTH        ( 32                  )
+) axi_slave_i (
+    .S_AXI_ACLK             ( ACLK               ),  //input
+    .S_AXI_ARESETN          ( ARESETN            ),  //input
+
+    .S_AXI_AWADDR           ( M_AXI_GP0_awaddr    ),  //input
+    .S_AXI_AWPROT           ( M_AXI_GP0_awprot    ),  //input
+    .S_AXI_AWVALID          ( M_AXI_GP0_awvalid   ),  //input
+    .S_AXI_AWREADY          ( M_AXI_GP0_awready   ),  //output
+
+    .S_AXI_WDATA            ( M_AXI_GP0_wdata     ),  //input
+    .S_AXI_WSTRB            ( M_AXI_GP0_wstrb     ),  //input
+    .S_AXI_WVALID           ( M_AXI_GP0_wvalid    ),  //input
+    .S_AXI_WREADY           ( M_AXI_GP0_wready    ),  //output
+
+    .S_AXI_BRESP            ( M_AXI_GP0_bresp     ),  //output
+    .S_AXI_BVALID           ( M_AXI_GP0_bvalid    ),  //output
+    .S_AXI_BREADY           ( M_AXI_GP0_bready    ),  //input
+
+    .S_AXI_ARADDR           ( M_AXI_GP0_araddr    ),  //input
+    .S_AXI_ARPROT           ( M_AXI_GP0_arprot    ),  //input
+    .S_AXI_ARVALID          ( M_AXI_GP0_arvalid   ),  //input
+    .S_AXI_ARREADY          ( M_AXI_GP0_arready   ),  //output
+
+    .S_AXI_RDATA            ( M_AXI_GP0_rdata     ),  //output
+    .S_AXI_RRESP            ( M_AXI_GP0_rresp     ),  //output
+    .S_AXI_RVALID           ( M_AXI_GP0_rvalid    ),  //output
+    .S_AXI_RREADY           ( M_AXI_GP0_rready    ),  //input
+
+    .rx_req                 (                     ),  //output
+    .rx_req_size            (                     ),  //output
+    .rx_done                (                     ),  //input
+    
+    .rd_address             (                     ),  //input
+    .wr_address             (                     ),  //input
+
+    .total_cycles           (                     ),  //input
+    .rd_cycles              (                     ),  //input
+    .pr_cycles              (                     ),  //input
+    .wr_cycles              (                     ),  //input
+
+    .r_count                (                     ),  //input
+    .w_count                (                     ),  //input
+    .ar_count               (                     ),  //input
+    .aw_count               (                     )   //input
+);
+//--------------------------------------------------------------
 endmodule

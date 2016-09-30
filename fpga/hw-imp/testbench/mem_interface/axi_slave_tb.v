@@ -153,8 +153,10 @@ axi_slave_tb_driver
     .rd_cycles                  ( rd_cycles             ), //output 
     .pr_cycles                  ( pr_cycles             ), //output 
     .wr_cycles                  ( wr_cycles             ), //output 
+
     .S_AXI_ACLK                 ( ACLK                  ), //output 
     .S_AXI_ARESETN              ( ARESETN               ), //output 
+
     .S_AXI_AWADDR               ( S_AXI_AWADDR          ), //output 
     .S_AXI_AWPROT               ( S_AXI_AWPROT          ), //output 
     .S_AXI_AWVALID              ( S_AXI_AWVALID         ), //output 
