@@ -43,14 +43,16 @@ This compiler was developed by Joon Kyung Kim and Chenkai Shao, both undergradua
 
 
 
+
 DESIGN BUILDER
 
 The design builder converts all the configuration provided by the compiler to customize the hardware template.
 
 run: 
-cd design-builder
-python builder.py
-
+```
+$cd design-builder
+$python builder.py
+```
 
 
 HARDWARE
