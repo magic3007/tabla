@@ -3,7 +3,7 @@
 Tabla is an innovative framework that accelerates a class of statistical machine learning algorithms. It consists of a domain specific language, Design Builder, a predesigned template, and a model compiler. 
 
 
-COMPILER
+### COMPILER
 
 ### Dependencies  
 If you would like to generate the lexer and parser, please refer to the "To generate lexer and parser directly" section below. Otherwise, you only need Python 3.4.3 or higher, in order to successfully run the compiler. If you would like to view the graphical representations of the compiler-generated dataflow graphs, Graphviz - graph visualization software - is needed. Please refer to the respective online resources in order to install them on your environment.  
@@ -44,7 +44,7 @@ This compiler was developed by Joon Kyung Kim and Chenkai Shao, both undergradua
 
 
 
-DESIGN BUILDER
+### DESIGN BUILDER
 
 The design builder converts all the configuration provided by the compiler to customize the hardware template.
 
@@ -55,7 +55,7 @@ $ python builder.py
 ```
 
 
-HARDWARE
+### HARDWARE
 
 The TABLA template design is a clustered hierarchical architecture constituting 
 1. Processing Units (PUs)
