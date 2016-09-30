@@ -2,8 +2,8 @@
 
 Tabla is an innovative framework that accelerates a class of statistical machine learning algorithms. It consists of a domain specific language, Design Builder, a predesigned template, and a model compiler. 
 
-This document will help you get up and running on the model compiler portion.  
 
+COMPILER
 
 ### Dependencies  
 If you would like to generate the lexer and parser, please refer to the "To generate lexer and parser directly" section below. Otherwise, you only need Python 3.4.3 or higher, in order to successfully run the compiler. If you would like to view the graphical representations of the compiler-generated dataflow graphs, Graphviz - graph visualization software - is needed. Please refer to the respective online resources in order to install them on your environment.  
@@ -40,3 +40,34 @@ $ python3 pygrun.py Tabla program --tokens TEST_FILE.t
 
 ### Developers
 This compiler was developed by Joon Kyung Kim and Chenkai Shao, both undergraduate students at Georgia Institute of Technology. For any inquiries, please contact *jkkim@gatech.edu* or *cshao31@gatech.edu*.
+
+
+
+DESIGN BUILDER
+
+The design builder converts all the configuration provided by the compiler to customize the hardware template.
+
+run: 
+cd design-builder
+python builder.py
+
+
+
+HARDWARE
+
+The TABLA template design is a clustered hierarchical architecture constituting 
+1. Processing Units (PUs)
+2. Processing Engines (PEs).
+
+This clustered template architecture is scalable, general, and highly customizable.
+
+The code for the entire template, memory interface, FPGA wrapper is in fpga/hw-imp. 
+
+Directory Hierarchy:
+fpga/hw-imp/source -> source Verilog files
+fpga/hw-imp/source/mem_interface -> source files which have the memory interface Verilog files
+fpga/hw-imp/source/ALU -> compute Verilog modules that perform the arithmetic functions
+fpga/hw-imp/source/basic -> basic multiplexer and other files
+
+To simulate this code. Change the top module in fpga/hw-imp/tb.list and run:
+make test in fpga directory.
