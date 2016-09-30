@@ -1,0 +1,143 @@
+include/log.vh
+include/inst.vh
+##---- #####################################
+##---- ##  COMPUTE ELEMENTS
+##---- #####################################
+source/ALU/adder.v
+testbench/addSub_tb.v
+
+source/ALU/mac.v
+testbench/mac_tb.v
+
+source/ALU/comparator.v
+testbench/comparator_tb.v
+
+source/ALU/divider.v
+testbench/divider_tb.v
+
+source/ALU/sqrt.v
+testbench/sqrt_tb.v
+
+source/ALU/sigmoid.v
+testbench/sigmoid_tb.v
+source/pe_compute.v
+
+testbench/pe_compute_tb.v
+
+##---- #####################################
+##---- ##	MEMORY 
+##---- #####################################
+source/basic/reg.v
+source/basic/iBuffer.v
+source/basic/Cnter.v
+source/basic/rdFifo.v
+
+source/bram_stall.v
+source/comp_stall.v
+
+source/basic/buffer.v
+testbench/buffer_tb.v
+
+source/pe_namespace.v
+testbench/pe_namespace_tb.v
+
+source/pe_namespace_wrapper.v
+testbench/pe_namespace_wrapper_tb.v
+
+source/pe_mem_interface.v
+
+#####################################
+##  AUXILLARY MODULES
+#####################################
+source/basic/mux_2x1.v
+
+#####################################
+##  PE
+#####################################
+source/pe.v
+testbench/pe_tb.v
+
+#####################################
+##  PU
+#####################################
+source/pu.v
+testbench/pu_tb.v
+
+#####################################
+##  Accelerator
+#####################################
+source/accelerator.v
+testbench/accelerator_tb.v
+
+
+#####################################
+##  Controller
+#####################################
+source/operand_selector.v
+source/instCutter.v
+source/decoder.v
+source/pe_controller.v
+testbench/pe_controller_tb.v
+
+#####################################
+##  Top wrapper
+#####################################
+source/zynq_wrapper/zynq_wrapper.v
+source/zynq_wrapper/zynq_loopback_wrapper.v
+
+#####################################
+##  AXI
+#####################################
+source/mem_interface/axi_master.v
+source/mem_interface/axi_slave.v
+testbench/mem_interface/axi_master_tb.v
+testbench/mem_interface/axi_master_tb_driver.v
+testbench/mem_interface/axi_slave_tb_driver.v
+testbench/mem_interface/axi_slave_tb.v
+
+
+#####################################
+##  DATA SHUFFLE
+#####################################
+source/data_shuffle/shuffler.v
+source/mem_interface/shifter.v
+
+testbench/shifter_tb.v
+
+#####################################
+##  MEM Interface
+#####################################
+source/mem_interface/read_if_control.v
+source/mem_interface/mem_interface.v
+testbench/mem_interface/mem_interface_tb.v
+
+#####################################
+##  FIFO
+#####################################
+source/mem_interface/fifo.v
+source/mem_interface/fifo_fwft.v
+
+#####################################
+##  Basic
+#####################################
+source/basic/mux.v
+source/basic/ROM.v
+
+#####################################
+##  Tabla
+#####################################
+source/tabla/tabla_wrapper.v
+testbench/tabla/tabla_wrapper_tb.v
+
+source/pe_dummy.v
+
+#####################################
+##  Loopback
+#####################################
+source/loopback_demo/loopback.v
+testbench/loopback/loopback_tb.v
+
+#####################################
+##  Weight Read
+#####################################
+testbench/mem_interface/weight_read_tb.v

@@ -1,0 +1,192 @@
+#include <stdio.h>
+#include "platform.h"
+#include "xil_types.h"
+#include "xil_printf.h"
+#include "xil_cache.h"
+
+#define AXI_GP0_MASTER_BASE_ADDR (u16*)0x43C00000
+#define AXI_HP0_RD_BASE_ADDR     (u16*)0x00000000
+#define AXI_HP0_WR_BASE_ADDR     (u16*)0x02000000
+
+#define KERNEL_WIDTH    3
+#define KERNEL_HEIGHT   3
+#define IMAGE_WIDTH     10
+#define IMAGE_HEIGHT    4
+#define OUTPUT_WIDTH    (IMAGE_WIDTH-KERNEL_WIDTH+1)
+#define OUTPUT_HEIGHT   (IMAGE_HEIGHT-KERNEL_HEIGHT+1)
+#define NUM_PE          4
+
+void convolution(u16* data, u16* kernel, u16* output) {
+    u16 x, y, ih, iw, kw, kh;
+
+	for (ih=0; ih<OUTPUT_HEIGHT; ih++) {
+	    for (iw=0; iw<OUTPUT_WIDTH; iw++) {
+            *(output+iw+ih*OUTPUT_WIDTH) = 0;
+	        for (kh=0; kh<KERNEL_HEIGHT; kh++) {
+	            for (kw=0; kw<KERNEL_WIDTH; kw++) {
+                    x = *(kernel+kw+kh*KERNEL_WIDTH);
+                    y = data[(ih+kh)*(IMAGE_WIDTH+IMAGE_WIDTH%NUM_PE)+(iw+kw)];
+                    //xil_printf ("A:%d, B:%d, C:%d", x, y, *(output+iw+ih*OUTPUT_WIDTH));
+                    *(output+iw+ih*OUTPUT_WIDTH) += x * y;
+                    //xil_printf ("Out:%d\n\r ", *(output+iw+ih*OUTPUT_WIDTH));
+	            }
+	        }
+            //xil_printf ("\n\n\r ");
+	    }
+	}
+}
+
+void square_sum(u16* data, u16* output) {
+    u16 x, y, ih, iw, kw, kh;
+    int index;
+	for (ih=0; ih<OUTPUT_HEIGHT; ih++) {
+	    for (iw=0; iw<OUTPUT_WIDTH; iw++) {
+            index = iw+ih*OUTPUT_WIDTH;
+            *(output+index) = 0;
+	        for (kh=0; kh<KERNEL_HEIGHT; kh++) {
+	            for (kw=0; kw<KERNEL_WIDTH; kw++) {
+                    y = data[(ih+kh)*(IMAGE_WIDTH+IMAGE_WIDTH%NUM_PE)+(iw+kw)];
+                    x = y;
+                    //xil_printf ("A:%d, B:%d, C:%d", x, y, *(output+index));
+                    *(output+index) += x * y;
+                    //xil_printf ("IW:%d,IH:%d, Out:%d\n\r ", iw, ih, *(output+index));
+	            }
+	        }
+            //xil_printf ("\n\n\r ");
+	    }
+	}
+}
+
+void lrn_weights(u16* data, u16* output) {
+    u16 ih, iw, x, y, ih_offset, iw_offset;
+    ih_offset = (KERNEL_HEIGHT-1)/2;
+    iw_offset = (KERNEL_WIDTH-1)/2;
+    int index;
+	for (ih=0; ih<OUTPUT_HEIGHT; ih++) {
+	    for (iw=0; iw<OUTPUT_WIDTH; iw++) {
+            index = iw+ih*OUTPUT_WIDTH;
+            y = data[(ih+ih_offset)*(IMAGE_WIDTH+IMAGE_WIDTH%NUM_PE)+(iw+iw_offset)];
+            x = *(output+index) % 16;
+            xil_printf ("%5d * %5d", y, x);
+            *(output+index) = x*y;
+        }
+    }
+}
+
+void normalization (u16* data, u16* output) {
+    square_sum(data, output);
+    lrn_weights(data, output);
+}
+
+int main () {
+	init_platform();
+	Xil_DCacheDisable();
+
+	int i, k = 16;
+    u16 output[OUTPUT_WIDTH][OUTPUT_HEIGHT];
+    u16* outPtr = output;
+    int index;
+
+	xil_printf (" ==================================================\n\r ");
+	xil_printf ("Loopback Test\n\r ");
+	u32 * base_address = AXI_GP0_MASTER_BASE_ADDR;
+	u16 * rd_address   = AXI_HP0_RD_BASE_ADDR;
+	u16 * wr_address   = AXI_HP0_WR_BASE_ADDR;
+
+	for (i=0; i<10*OUTPUT_WIDTH*OUTPUT_HEIGHT; i++) {
+		*(wr_address+i) = 1;
+	}
+	xil_printf("    Done!\n\r ");
+
+    xil_printf ("Initializing Read location\n\r ");
+    u16 j = 1;
+    for (i=0; j<IMAGE_WIDTH*IMAGE_HEIGHT+1; i++) {
+        if (i%(IMAGE_WIDTH+IMAGE_WIDTH%NUM_PE) < IMAGE_WIDTH) {
+	        *(rd_address+i) = j;
+            j++;
+        }
+        else {
+	        *(rd_address+i) = 0;
+        }
+	    if (j <= IMAGE_WIDTH * IMAGE_HEIGHT) xil_printf ("READ Address:%08x Value:%d\n\r ", rd_address+i, *(rd_address+i));
+    }
+	xil_printf("    Done!\n\r ");
+
+	xil_printf("Invoking the accelerator\n\r ");
+	*(base_address+0) = 0x00000001;
+	xil_printf("Waiting for the accelerator to finish processing\n\r ");
+	//sleep(1);
+	while (*(base_address+1) != 1) {
+		sleep(5);
+	}
+
+    xil_printf ("Read_finished: %d\n\r ", *(base_address+2));
+    xil_printf ("processing_finished: %d\n\n\r ", *(base_address+3));
+    xil_printf ("total_cycles : %d\n\r ", *(base_address+4));
+    xil_printf ("rd_cycles    : %d\n\r ", *(base_address+5));
+    xil_printf ("pr_cycles    : %d\n\r ", *(base_address+6));
+    xil_printf ("wr_cycles    : %d\n\r ", *(base_address+7));
+
+	xil_printf("    Done!\n\r ");
+    xil_printf("Verifying results \n\r ");
+    u16 count = 0;
+    u16 iw, ih, kw, kh;
+    u16 kernel[KERNEL_WIDTH][KERNEL_HEIGHT];
+
+	for (kh=0; kh<KERNEL_HEIGHT; kh++) {
+	    for (kw=0; kw<KERNEL_WIDTH; kw++) {
+            kernel[kh][kw] = kh*KERNEL_WIDTH+kw;
+	    }
+	}
+
+    convolution (rd_address, kernel, output);
+    //square_sum (rd_address, output);
+    //normalization (rd_address, output);
+
+    xil_printf ("Expected output:\n\r ");
+	for (ih=0; ih<OUTPUT_HEIGHT; ih++) {
+	    for (iw=0; iw<OUTPUT_WIDTH; iw++) {
+	        for (kh=0; kh<KERNEL_HEIGHT; kh++) {
+	            for (kw=0; kw<KERNEL_WIDTH; kw++) {
+	            }
+	        }
+            index = iw+ih*OUTPUT_WIDTH;
+            xil_printf("%6d ", *(outPtr+index));
+	    }
+        xil_printf("\n\r ");
+	}
+
+    xil_printf ("Received output:\n\r ");
+    for (ih=0; ih<OUTPUT_HEIGHT+0; ih++) {
+        for (iw=0; iw<OUTPUT_WIDTH; iw++) {
+            u16 a = *(wr_address+iw+ih*OUTPUT_WIDTH);
+            index = iw+ih*OUTPUT_WIDTH;
+            u16 b = *(outPtr+index);
+	        xil_printf ("%6d ", a);
+            if (a != b) {
+                count++;
+	            xil_printf ("!= %6d,\n\r ", b);
+            }
+            else {
+	            xil_printf ("== %6d,\n\r ", b);
+            }
+        }
+        xil_printf ("\n\r ");
+    }
+
+    if (count > 0) {
+        xil_printf ("Results : Failed\n\r ");
+    }
+    else {
+        xil_printf ("Results : Passed\n\r ");
+    }
+    xil_printf ("total_cycles : %d\n\r ", *(base_address+4));
+    xil_printf ("rd_cycles    : %d\n\r ", *(base_address+5));
+    xil_printf ("pr_cycles    : %d\n\r ", *(base_address+6));
+    xil_printf ("wr_cycles    : %d\n\r ", *(base_address+7));
+	xil_printf ("==================================================\n\r ");
+
+	cleanup_platform();
+	return 0;
+}
+
