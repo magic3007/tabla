@@ -65,7 +65,8 @@ This clustered template architecture is scalable, general, and highly customizab
 
 The code for the entire template, memory interface, FPGA wrapper is in fpga/hw-imp. 
 
-Directory Hierarchy:
+### Directory Hierarchy:
+
 fpga/hw-imp/source -> source Verilog files
 fpga/hw-imp/source/mem_interface -> source files which have the memory interface Verilog files
 fpga/hw-imp/source/ALU -> compute Verilog modules that perform the arithmetic functions
