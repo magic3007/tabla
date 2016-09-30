@@ -69,5 +69,7 @@ fpga/hw-imp/source/mem_interface -> source files which have the memory interface
 fpga/hw-imp/source/ALU -> compute Verilog modules that perform the arithmetic functions
 fpga/hw-imp/source/basic -> basic multiplexer and other files
 
-To simulate this code. Change the top module in fpga/hw-imp/tb.list and run:
-make test in fpga directory.
+To simulate this code. Change the top module in fpga/hw-imp/tb.list and run from fpga directory:
+```
+$ make test
+```
