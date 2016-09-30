@@ -50,8 +50,8 @@ The design builder converts all the configuration provided by the compiler to cu
 
 run: 
 ```
-$cd design-builder
-$python builder.py
+$ cd design-builder
+$ python builder.py
 ```
 
 
