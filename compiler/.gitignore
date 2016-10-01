@@ -13,3 +13,6 @@ schedule.json
 tabla.jpeg
 *.json
 *.csv
+./bin/
+./inst/
+./hex/
