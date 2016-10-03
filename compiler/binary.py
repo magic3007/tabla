@@ -124,49 +124,45 @@ def generate_bin(insts):
                 ns = code.namespace[dest.namespace]
                 if dest.namespace == "NN":
                     pe_index = dest.index[:-1]
-                    #ind = format(int(pe_index), index_format_str)
                     ind = format(int(pe_index), '0'+ str(index_bit - 1) + 'b')
                     bin_dests += (format(ns, ns_format_str) + ind + dest.index[-1])
                 elif dest.namespace == "NB":
                     if dest.index[-1] == '0':
                         pe_index = dest.index[:-1]
-                        #ind = format(int(pe_index), index_format_str)
                         ind = format(int(pe_index), '0'+ str(index_bit - 1) + 'b')
                         bin_dests += (format(ns, ns_format_str) + ind + dest.index[-1])
                     elif dest.index[-1] == '1':
                         pe_index = dest.index[:-1]
-                        #ind = format(int(pe_index), index_format_str)
                         ind = format(int(pe_index), '0'+ str(index_bit - 1) + 'b')
                         bin_dests += (format(ns, ns_format_str) + ind + dest.index[-1])
                     else:
                         raise Exception()
                 else:
-                    #bin_dests += (format(ns, ns_format_str) + format(int(dest.index), index_format_str) + '0')
                     bin_dests += (format(ns, ns_format_str) + format(int(dest.index), index_format_str))
             bin_srcs = ""
             for src in srcs:
+                if src.namespace is None:
+                    src.namespace = 'NL'
+                if src.index is None:
+                    src.index = 0
                 ns = code.namespace[src.namespace]
                 if src.namespace == "NN":
                     pe_index = src.index[:-1]
-                    #ind = format(int(pe_index), index_format_str)
                     ind = format(int(pe_index), '0'+ str(index_bit - 1) + 'b')
                     bin_srcs += (format(ns, ns_format_str) + ind + src.index[-1])
                 elif src.namespace == "NB":
                     if src.index[-1] == '0':
                         pe_index = src.index[:-1]
-                        #ind = format(int(pe_index), index_format_str)
                         ind = format(int(pe_index), '0'+ str(index_bit - 1) + 'b')
                         bin_srcs += (format(ns, ns_format_str) + ind + src.index[-1])
                     elif src.index[-1] == '1':
                         pe_index = src.index[:-1]
-                        #ind = format(int(pe_index), index_format_str)
                         ind = format(int(pe_index), '0'+ str(index_bit - 1) + 'b')
                         bin_srcs += (format(ns, ns_format_str) + ind + src.index[-1])
                     else:
                         print(src)
                         raise Exception()
                 else:
-                    #bin_srcs += (format(ns, ns_format_str) + format(int(src.index), index_format_str) + '0')
                     bin_srcs += (format(ns, ns_format_str) + format(int(src.index), index_format_str))
             binary = str(bin_op) + bin_dests + bin_srcs
         bin_lines.append(binary)
@@ -175,10 +171,8 @@ def generate_bin(insts):
 def readFrom(path):
     with open(path, 'r') as f:
         contents = f.read()
-    f.close()
     insts = json.loads(contents)
     for inst in insts:
-        #inst_dict = inst["inst"]
         instruction = instruc.Inst()
         instruction.fromDict(inst)
         inst["inst"] = instruction

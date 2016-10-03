@@ -21,7 +21,7 @@ class Namespace:
 
     def get(self, i):
         """ Returns None if trying to get garbage or None."""
-        if i >=0 and i < len(self.buf):
+        if i >= 0 and i < len(self.buf):
             entry = self.buf[i]
             if entry is not None and entry.valid is True:
                 entry_copy = Ns_entry(data=entry.data)
@@ -29,12 +29,14 @@ class Namespace:
                 return entry_copy
 
     def insert(self, i, ns_entry):
-        status = False  ## return status
+        status = False  # return status
         if i >= 0 and i < len(self.buf):
             if self.buf[i] is None or self.buf[i].valid is False:
                 self.buf[i] = ns_entry
                 status = True
                 self.update_tail()
+                if self.tail == -1:
+                    status = False
         return status
 
     def update_tail(self):

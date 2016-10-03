@@ -10,7 +10,6 @@ class Pe:
         self.inst = []
         self.cycle = 0
         self.pu = pu
-        
         self.nw = Namespace("NW", ns_size)
         self.nd = Namespace("ND", ns_size)
         self.ng = Namespace("NG", ns_size)
@@ -25,7 +24,6 @@ class Pe:
         self.nb1_in = Namespace("NB1_in", 1)
         self.nb1_out = Namespace("NB1_out", 1)
         self.nl = Namespace("NL", ns_size)
-
         self.namespace_map = {
             'NW'  : self.nw,
             'ND'  : self.nd,
@@ -42,8 +40,7 @@ class Pe:
             'NB1_out'  : self.nb1_out,
             'NL'  : self.nl,
         }
-        self.nslist = [self.nw, self.nd, self.ng, self.ni, self.nm, self.nn0_in, self.nn0_out, self.nn1_in, self.nn1_out, self.nb0_in, self.nb0_out, self.nb1_in, self.nb1_out, self.nl] ## this is only so that a loop can be used to print
-
+        self.nslist = [self.nw, self.nd, self.ng, self.ni, self.nm, self.nn0_in, self.nn0_out, self.nn1_in, self.nn1_out, self.nb0_in, self.nb0_out, self.nb1_in, self.nb1_out, self.nl] ## this is so that a loop can be used to print
         self.initialize_namespace(init_data)
 
     def initialize_namespace(self, init_data):
@@ -58,7 +55,7 @@ class Pe:
     def print_inst(self):
         if not os.path.exists("./inst/"):
             os.makedirs("./inst/")
-        filename = "./inst/pe{:d}inst.json".format(self.id)
+        filename = "./inst/pe{:s}inst.json".format(str(self.id).zfill(2))
         with open(filename, 'w') as f:
             s = [i.toDict() for i in self.inst]
             f.write(json.dumps(s, sort_keys=True, indent=2))
@@ -91,7 +88,6 @@ class Pe:
         elif op == "pass":
             src0 = src_values[0]
             out_entry = Ns_entry(data=src0)
-            
 
         for dest in dests:
             dest_ns = dest.namespace
