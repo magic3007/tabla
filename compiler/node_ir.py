@@ -258,25 +258,24 @@ def classify_initial_nodes(node_graph):
                 w_nodes.append(node)
     return xy_nodes, w_nodes
 
-pe_used = {} ## pe-id to pe-object mapping
+
+pe_used = []
 
 def assign_pe_initial(xy_nodes, w_nodes, num_pes, ns_size, ns_int_size, pu_pe):
-    """ This anchors pe's to both x y's and w's in the beginning """
-    pe_list = pu_pe[1]
+    """ 
+    This anchors pe's to both x y's and w's in the beginning.
+    Also returns a list of PE id's that are used ("active")
+    """
     
+    pe_list = pu_pe[1]
     if len(w_nodes) and len(xy_nodes):
         fill_ynodes = True
         i = 0
         for wnode in w_nodes:
             pe_id = i % num_pes
             pe = pe_list[pe_id]
-            '''
-            if pe_id in pe_used:
-                pe = pe_used[pe_id]
-            else:
-                pe = Pe(id=pe_id, ns_size=ns_size, ns_int_size=ns_int_size)
-                pe_used[pe_id] = pe
-            '''
+            if pe.id not in pe_used:
+                pe_used.append(pe.id)
             wnode.pe = pe
             if i < len(xy_nodes):
                 xy_nodes[i].pe = pe
@@ -287,14 +286,28 @@ def assign_pe_initial(xy_nodes, w_nodes, num_pes, ns_size, ns_int_size, pu_pe):
             for ynode in xy_nodes[i:]:
                 pe_id = i % num_pes
                 pe = pe_list[pe_id]
-                '''
-                if pe_id in pe_used:
-                    pe = pe_used[pe_id]
-                else:
-                    pe = Pe(id=pe_id, ns_size=ns_size, ns_int_size=ns_int_size)
-                '''
-                pe_used[pe_id] = pe
+                if pe.id not in pe_used:
+                    pe_used.append(pe.id)
                 ynode.pe = pe
+    return pe_used
+
+def get_special_modules(dfg, special_modules):
+    mod = []
+    translate = {
+        'sigmoid': 'SIG',
+        '/': 'DIV',
+        '#': 'SQR',
+        '*+': 'MACC',
+        '$': 'GAU'
+        }
+    for nodeid in dfg.nodes:
+        node = dfg.nodes[nodeid]
+        if node.op in special_modules:
+            mod_entry = translate[node.op]
+            if mod_entry not in mod:
+                mod.append(mod_entry)
+    return mod
+
 
 def readFrom(schedule_file):
     with open(schedule_file, 'r') as f:
@@ -302,6 +315,7 @@ def readFrom(schedule_file):
     f.close()
     cycle2nodes = json.loads(contents, object_pairs_hook=OrderedDict)
     return cycle2nodes
+
     
         
 if __name__ == "__main__":

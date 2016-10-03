@@ -107,6 +107,14 @@ def main(argv):
     node_ir.assign_pes(dfg, num_pes, schedule, ns_size, ns_int_size, pu_pe)
     dfg.writeTo("./artifacts/nodes_ir.json")
 
+    # record active pe's
+    writeTo('./active_pes.json', node_ir.pe_used)
+
+    # get SIG, DIV stuff
+    special_modules = ['sigmoid', '/', '#', '*+', '$']
+    mods = node_ir.get_special_modules(dfg, special_modules)
+    writeTo('./special_modules.json', mods)
+
     #dfg = inst.readFrom("./artifacts/nodes_ir.json")
     inst.generate_inst(dfg, pes_per_pu)
     for pe in pe_list:
@@ -122,6 +130,10 @@ def main(argv):
         b = binary.generate_bin(insts)
         binary.writeTo(f, b, config["hex"])
 
+
+def writeTo(path, s):
+    with open(path, 'w') as f:
+        f.write(json.dumps(s, sort_keys=False, indent=2))
             
 if __name__ == '__main__':
     main(sys.argv)
