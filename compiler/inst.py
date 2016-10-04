@@ -129,8 +129,8 @@ def generate_inst(node_graph, pe_per_pu):
                 inst = Inst()
                 dests = []
                 if node.pe is None: # constants without pe assignment
+                    namespace_id = data_type_to_ns[node.outDataType]
                     for child in node.children:
-                        namespace_id = data_type_to_ns[node.outDataType]
                         namespace = child.pe.namespace_map[namespace_id]
                         index = namespace.tail
                         namespace.insert(namespace.tail, Ns_entry())
@@ -138,11 +138,11 @@ def generate_inst(node_graph, pe_per_pu):
                     inst.dests = dests
                     node.inst.append(inst)
                 else:
+                    namespace_id = data_type_to_ns[node.outDataType]
+                    namespace = node.pe.namespace_map[namespace_id]
+                    index = namespace.tail
+                    namespace.insert(namespace.tail, Ns_entry())
                     for child in node.children:
-                        namespace_id = data_type_to_ns[node.outDataType]
-                        namespace = node.pe.namespace_map[namespace_id]
-                        index = namespace.tail
-                        namespace.insert(namespace.tail, Ns_entry())
                         dests.append(Dest(namespace_id, str(index), child.id))
                     inst.dests = dests
                     node.inst.append(inst)
@@ -501,8 +501,7 @@ def get_dest(curr_pe, child_pe, pe_per_pu, node=None):
 def get_src(node, parent_node, pe_per_pu):
     node_insts = parent_node.inst
     for inst in node_insts:
-        set_of_dests = inst.dests
-        for dest in set_of_dests:
+        for dest in inst.dests:
             if type(dest) == tuple:
                 continue
             if dest.dest_node_id == node.id:
@@ -515,7 +514,7 @@ def get_src(node, parent_node, pe_per_pu):
                         ns = node.pe.namespace_map[dest.namespace]
                     else:
                         ns = parent_node.pe.namespace_map[dest.namespace]
-                    ns.get(int(dest.index)) # dummy get() to free up space
+                    #ns.get(int(dest.index)) # dummy get() to free up space
                     return Source(dest.namespace, dest.index)
 
 

@@ -55,6 +55,7 @@ def genpus(num_pes, pes_per_pu, ns_size, ns_int_size):
             pe_count += 1
     return (pu_list, pe_list)
 
+
 def main(argv):
     config = read_config("./config.json")
     
@@ -67,7 +68,7 @@ def main(argv):
     stream = CommonTokenStream(lexer)
     parser = TablaParser(stream)
     tree = parser.program()   # 'program' is the starting rule. The parser is invoked by calling the starting rule.
-
+    
     # graph creation should happen here
     print('\n\n================================')
     dfg_file = 'artifacts/dfg.json'
@@ -129,6 +130,7 @@ def main(argv):
         insts = binary.readFrom("./inst/" + f)
         b = binary.generate_bin(insts)
         binary.writeTo(f, b, config["hex"])
+    
 
 
 def writeTo(path, s):

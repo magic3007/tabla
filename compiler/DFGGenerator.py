@@ -13,7 +13,6 @@ class DFGGenerator:
         self.parseTree = None
 
     def create(self, tree):
-
         self.parseTree = tree
         self.dfg = DataFlowGraph()
         self.funcTypeTable = {}
