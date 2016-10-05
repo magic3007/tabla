@@ -1,5 +1,5 @@
 # these two variables determine how many read instructions are required
-m = 202 # model size - basically total number of data read in each iteration
+m = 200 # model size - basically total number of data read in each iteration
 axi_size = 64 # number of data elements read by each AXI
 axi_read_cycl = 4 # number of data elements read in one cycle
 
@@ -68,16 +68,30 @@ def get_data_allaxi_cycle(cycl, axi_list):
             alldata.append(axi.data_by_cycle[cycl])
     return alldata
 
+
+def get_maxcycle(axi_list):
+    maxcycle = 0
+    for axi in axi_list:
+        if len(axi.data_by_cycle) > maxcycle:
+            maxcycle = len(axi.data_by_cycle)
+    return maxcycle
+
+
+def get_data_allaxi(maxcycle, axi_list):
+    data = []
+    for i in range(maxcycle):
+        alldata_cycle = get_data_allaxi_cycle(i, axi_list)
+        data.append(alldata_cycle)
+        print("cycle ", i, ": ", alldata_cycle)
+    return data
+
             
 if __name__ == '__main__':
-    data = init_data(m) # data set in one iteration (x[0] ... x[63])
+    data = init_data(m) # data set in one iteration (e.g. x[0] ... x[63])
     assign_axi(data, axi_list)
     divide_axidata_by_cycle(axi_list)
-    # print(axi0.data)
-    # print(axi1.data)
-    # print(axi2.data)
-    # print(axi3.data)
-    alldata = get_data_allaxi_cycle(15, axi_list)
-    print(alldata)
+    maxcycle = get_maxcycle(axi_list)
+    alldata = get_data_allaxi(maxcycle, axi_list)
+    
     
     
