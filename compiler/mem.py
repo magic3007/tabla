@@ -1,9 +1,5 @@
 import json
 
-class DataIn:
-    def __init__(self, peid):
-        self.peid = peid
-
 class Lane:
     def __init__(self, laneid, peids):
         self.laneid = laneid
@@ -72,19 +68,20 @@ def init_lanes(nlanes, pes_per_lane):
 
 ''' manually set for now '''
 def read_ddr():
-    read_vals = [DataIn(0), DataIn(1), DataIn(2), DataIn(3), DataIn(64), DataIn(65), DataIn(66), DataIn(67), DataIn(128), DataIn(129), DataIn(130), DataIn(131), DataIn(192), DataIn(193), DataIn(194), DataIn(195)]
+    read_vals = [0, 1, 2, 3, 64, 65, 66, 67, 128, 129, 130, 131, 192, 193, 194, 195]
     return read_vals
 
 
 def get_lanesbyshift(read_vals):
     lanesbyshift = {}
     for curr_pos, data in enumerate(read_vals):
-        dest_laneid = get_dest_laneid(data.peid % 64)
+        dest_peid = data % 64
+        dest_laneid = get_dest_laneid(dest_peid)
         shiftamount = get_shiftamount(curr_pos, dest_laneid)
         if shiftamount in lanesbyshift:
-            lanesbyshift[shiftamount].append((dest_laneid, data.peid % 64))
+            lanesbyshift[shiftamount].append((dest_laneid, dest_peid))
         else:
-            lanesbyshift[shiftamount] = [(dest_laneid, data.peid % 64)]
+            lanesbyshift[shiftamount] = [(dest_laneid, dest_peid)]
         print("pos: {:d}, dest_laneid: {:d}, shift to left: {:d}".format(curr_pos, dest_laneid, shiftamount))
     return lanesbyshift
 
