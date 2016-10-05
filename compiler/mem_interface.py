@@ -1,5 +1,5 @@
 # these two variables determine how many read instructions are required
-m = 64 # model size - basically total number of data read in each iteration
+m = 202 # model size - basically total number of data read in each iteration
 axi_size = 64 # number of data elements read by each AXI
 axi_read_cycl = 4 # number of data elements read in one cycle
 
@@ -16,11 +16,12 @@ def init_data(m):
 
 class AXI:
     size = axi_size
+    #cycle = 0
     
     def __init__(self):
         self.lanes = []
         self.data = []
-        self.data_by_cycle = [[]]
+        self.data_by_cycle = []
 
 
 axi0 = AXI()
@@ -44,12 +45,39 @@ def assign_axi(data, axi_list):
             axi_list[i].data.extend(data[i * axi_size :])
         
 
+def divide_axidata_by_cycle(axi_list):
+    for axi in axi_list:
+        cycls = len(axi.data) // axi_read_cycl
+        r = len(axi.data) % axi_read_cycl
+        for i in range(cycls):
+            axi.data_by_cycle.append(axi.data[i * axi_read_cycl : i * axi_read_cycl + axi_read_cycl])
+        if r > 0:
+            if cycls == 0:
+                axi.data_by_cycle.append(axi.data[:])
+            else:
+                i += 1
+                axi.data_by_cycle.append(axi.data[i * axi_read_cycl :])
+
+
+def get_data_allaxi_cycle(cycl, axi_list):
+    alldata = []
+    for axi in axi_list:
+        if cycl >= len(axi.data_by_cycle):
+            alldata.append([])
+        else:
+            alldata.append(axi.data_by_cycle[cycl])
+    return alldata
+
+            
 if __name__ == '__main__':
     data = init_data(m) # data set in one iteration (x[0] ... x[63])
     assign_axi(data, axi_list)
-    print(axi0.data)
-    print(axi1.data)
-    print(axi2.data)
-    print(axi3.data)
+    divide_axidata_by_cycle(axi_list)
+    # print(axi0.data)
+    # print(axi1.data)
+    # print(axi2.data)
+    # print(axi3.data)
+    alldata = get_data_allaxi_cycle(15, axi_list)
+    print(alldata)
     
     
