@@ -110,6 +110,13 @@ def gen_read_inst():
     return Meminst("read")
 
 
+def gen_wfi_inst():
+    return Meminst("wfi")
+
+
+def gen_loop_inst():
+    return Meminst("loop")
+
 def writeTo(path, s):
     with open(path, 'w') as f:
         f.write(s)
@@ -136,10 +143,6 @@ opbin = {
     }
 
 
-def gen_ns_bin(ns):
-    return format(nsbin[ns], '0' + str(namespace_bits) + 'b')
-
-
 def gen_singlelane_bin(lane):
     peid = lane["relpe"]
     valid = lane["valid"]
@@ -149,10 +152,14 @@ def gen_singlelane_bin(lane):
 
 def gen_lanes_bin(lanes):
     bin = ''
-    for lane in lanes:
+    for lane in reversed(lanes):
         bin += gen_singlelane_bin(lane)
     bin += gen_ns_bin("data")
     return bin
+
+
+def gen_ns_bin(ns):
+    return format(nsbin[ns], '0' + str(namespace_bits) + 'b')
 
 
 def gen_opcode_bin(op):
@@ -161,7 +168,6 @@ def gen_opcode_bin(op):
 
 def gen_shift_bin(shift):
     return format(shift, '0' + str(shift_bits) + 'b')
-
 
 
 # these two variables determine how many read instructions are required
@@ -265,6 +271,8 @@ if __name__ == "__main__":
             affectedlanes = lanesbyshift[shiftamount]
             inst = gen_shift_inst(shiftamount, affectedlanes, lanes)
             instrs.append(inst)
+    instrs.append(gen_wfi_inst())
+    instrs.append(gen_loop_inst())
     writeTo("./meminst.json", json.dumps([i.toDict() for i in instrs], sort_keys=False, indent=2))
 
     binary = ''
