@@ -11,10 +11,11 @@ class Lane:
 
     def get_relpeid(self, peid):
         if peid in self.peids:
-            if self.laneid == 0:
-                return peid
-            else:
-                return peid % self.laneid
+            return self.peids.index(peid)
+            # if self.laneid == 0:
+            #     return peid
+            # else:
+            #     return peid % self.laneid
         else:
             raise Exception("PE ID {:d} not in this lane!".format(peid))
 
@@ -41,7 +42,7 @@ class Meminst:
             })
         return lanes
 
-    def set_laneinst(self, laneid, relpeid):
+    def set_laneinst_at(self, laneid, relpeid):
         d = self.lanes[laneid]
         d["relpe"] = relpeid
         d["valid"] = 1
@@ -61,20 +62,42 @@ nlanes = 16
 pes_per_lane = 4
 shiftleft = True
 
+
+def init_lanes(nlanes, pes_per_lane):
+    lanes = []
+    for base_peid in range(nlanes):
+        lanes.append(Lane(base_peid, [base_peid + nlanes * i for i in range(pes_per_lane)]))
+    return lanes
+
+
 ''' manually set for now '''
 def read_ddr():
-    read_vals = [DataIn(1), DataIn(3), DataIn(5), DataIn(7), DataIn(9), DataIn(11), DataIn(13), DataIn(15), DataIn(2), DataIn(4), DataIn(6), DataIn(8), DataIn(10), DataIn(12), DataIn(14), DataIn(0)]
+    read_vals = [DataIn(0), DataIn(1), DataIn(2), DataIn(3), DataIn(64), DataIn(65), DataIn(66), DataIn(67), DataIn(128), DataIn(129), DataIn(130), DataIn(131), DataIn(192), DataIn(193), DataIn(194), DataIn(195)]
     return read_vals
 
-def get_shiftamount(laneid, pos):
+
+def get_lanesbyshift(read_vals):
+    lanesbyshift = {}
+    for curr_pos, data in enumerate(read_vals):
+        dest_laneid = get_dest_laneid(data.peid % 64)
+        shiftamount = get_shiftamount(curr_pos, dest_laneid)
+        if shiftamount in lanesbyshift:
+            lanesbyshift[shiftamount].append((dest_laneid, data.peid % 64))
+        else:
+            lanesbyshift[shiftamount] = [(dest_laneid, data.peid % 64)]
+        print("pos: {:d}, dest_laneid: {:d}, shift to left: {:d}".format(curr_pos, dest_laneid, shiftamount))
+    return lanesbyshift
+
+
+def get_shiftamount(pos, laneid):
     if pos >= laneid:
         shift = pos - laneid
     else:
-        shift = nlanes - (laneidp - pos)
+        shift = nlanes - (laneid - pos)
     return shift
     
-def getlane(peid):
-    return peid // pes_per_lane
+def get_dest_laneid(peid):
+    return peid % nlanes
 
 def get_laneobject(lanes, laneid):
     return lanes[laneid]
@@ -86,7 +109,7 @@ def gen_shift_inst(shiftamount, affectedlanes, lanes):
         peid = lane[1]
         laneobj = get_laneobject(lanes, laneid)
         relpeid = laneobj.get_relpeid(peid)
-        inst.set_laneinst(laneid, relpeid)
+        inst.set_laneinst_at(laneid, relpeid)
     return inst
 
 def gen_read_inst():
@@ -95,25 +118,6 @@ def gen_read_inst():
 def writeTo(path, s):
     with open(path, 'w') as f:
         f.write(s)
-
-def init_lanes(nlanes, pes_per_lane):
-    lanes = []
-    for i in range(nlanes):
-        pid = i * pes_per_lane
-        lanes.append(Lane(i, [pid + offset for offset in range(pes_per_lane)]))
-    return lanes
-
-def get_lanesbyshift(read_vals):
-    lanesbyshift = {}
-    for pos, data in enumerate(read_vals):
-        laneid = getlane(data.peid)
-        shiftamount = get_shiftamount(laneid, pos)
-        if shiftamount in lanesbyshift:
-            lanesbyshift[shiftamount].append((laneid, data.peid))
-        else:
-            lanesbyshift[shiftamount] = [(laneid, data.peid)]
-        #print("pos: {:d}, laneid: {:d}, shift to left: {:d}".format(pos, laneid, shiftamount))
-    return lanesbyshift
 
 
 peid_bits = 2
@@ -166,9 +170,9 @@ if __name__ == "__main__":
     read_vals = read_ddr()
     instrs = []
     while read_vals is not None:
+        instrs.append(gen_read_inst())
         lanesbyshift = get_lanesbyshift(read_vals)
         print("lanes by shift: ", lanesbyshift)
-        instrs.append(gen_read_inst())
         for shiftamount in lanesbyshift:
             affectedlanes = lanesbyshift[shiftamount]
             inst = gen_shift_inst(shiftamount, affectedlanes, lanes)

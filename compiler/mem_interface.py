@@ -20,8 +20,8 @@ class AXI:
     
     def __init__(self):
         self.lanes = []
-        self.data = []
-        self.data_by_cycle = []
+        self.data = [] # all data
+        self.data_by_cycle = [] # all data grouped by cycle (4 per cycle)
 
 
 axi0 = AXI()
@@ -35,9 +35,7 @@ axi_list = [axi0, axi1, axi2, axi3]
 def assign_axi(data, axi_list):
     q = m // axi_size
     r = m % axi_size
-    #print("q = {:d}, r = {:d}".format(q, r))
     for i in range(q):
-        #print(i % 4)
         axi_list[i % 4].data.extend(data[i * axi_size : i * axi_size + axi_size])
     if r > 0:
         if q == 0:
@@ -48,6 +46,9 @@ def assign_axi(data, axi_list):
 
 
 def divide_axidata_by_cycle(axi_list):
+    '''
+    Every AXI reads 4 data sets at a time.
+    '''
     for axi in axi_list:
         cycls = len(axi.data) // axi_read_cycl
         r = len(axi.data) % axi_read_cycl
@@ -62,6 +63,9 @@ def divide_axidata_by_cycle(axi_list):
 
 
 def get_data_allaxi_cycle(cycl, axi_list):
+    '''
+    This function reads all data from every axi in the given cycle.
+    '''
     alldata = []
     for axi in axi_list:
         if cycl >= len(axi.data_by_cycle):
@@ -71,14 +75,6 @@ def get_data_allaxi_cycle(cycl, axi_list):
     return alldata
 
 
-def get_maxcycle(axi_list):
-    maxcycle = 0
-    for axi in axi_list:
-        if len(axi.data_by_cycle) > maxcycle:
-            maxcycle = len(axi.data_by_cycle)
-    return maxcycle
-
-
 def get_data_allaxi(maxcycle, axi_list):
     data = []
     for i in range(maxcycle):
@@ -86,6 +82,15 @@ def get_data_allaxi(maxcycle, axi_list):
         data.append(alldata_cycle)
         print("cycle ", i, ": ", alldata_cycle)
     return data
+
+
+def get_maxcycle(axi_list):
+    maxcycle = 0
+    for axi in axi_list:
+        if len(axi.data_by_cycle) > maxcycle:
+            maxcycle = len(axi.data_by_cycle)
+    return maxcycle
+
 
             
 if __name__ == '__main__':
