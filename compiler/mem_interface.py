@@ -1,5 +1,5 @@
 # these two variables determine how many read instructions are required
-m = 200 # model size - basically total number of data read in each iteration
+m = 700 # model size - basically total number of data read in each iteration
 axi_size = 64 # number of data elements read by each AXI
 axi_read_cycl = 4 # number of data elements read in one cycle
 
@@ -35,15 +35,17 @@ axi_list = [axi0, axi1, axi2, axi3]
 def assign_axi(data, axi_list):
     q = m // axi_size
     r = m % axi_size
+    #print("q = {:d}, r = {:d}".format(q, r))
     for i in range(q):
+        #print(i % 4)
         axi_list[i % 4].data.extend(data[i * axi_size : i * axi_size + axi_size])
     if r > 0:
         if q == 0:
             axi_list[0].data.extend(data[:])
         else:
             i += 1
-            axi_list[i].data.extend(data[i * axi_size :])
-        
+            axi_list[i % 4].data.extend(data[i * axi_size :])
+
 
 def divide_axidata_by_cycle(axi_list):
     for axi in axi_list:
