@@ -8,10 +8,6 @@ class Lane:
     def get_relpeid(self, peid):
         if peid in self.peids:
             return self.peids.index(peid)
-            # if self.laneid == 0:
-            #     return peid
-            # else:
-            #     return peid % self.laneid
         else:
             raise Exception("PE ID {:d} not in this lane!".format(peid))
 
@@ -21,6 +17,7 @@ class Lane:
             "peids": self.peids
         }
         return d
+
 
 class Meminst:
     def __init__(self, op=None, shiftamount=0, nlanes=16):
@@ -53,6 +50,7 @@ class Meminst:
 
     def __str__(self):
         return json.dumps(self.toDict(), sort_keys=False, indent=2)
+
         
 nlanes = 16
 pes_per_lane = 4
@@ -68,7 +66,7 @@ def init_lanes(nlanes, pes_per_lane):
 
 ''' manually set for now '''
 def read_ddr():
-    read_vals = [0, 1, 2, 3, 64, 65, 66, 67, 128, 129, 130, 131, 192, 193, 194, 195]
+    read_vals = [0, 1, 2, 3, 64, 65, 66, 67, 128, 129, 130, 131]
     return read_vals
 
 
@@ -92,12 +90,15 @@ def get_shiftamount(pos, laneid):
     else:
         shift = nlanes - (laneid - pos)
     return shift
+
     
 def get_dest_laneid(peid):
     return peid % nlanes
 
+
 def get_laneobject(lanes, laneid):
     return lanes[laneid]
+
 
 def gen_shift_inst(shiftamount, affectedlanes, lanes):
     inst = Meminst("shift", shiftamount)
@@ -109,8 +110,10 @@ def gen_shift_inst(shiftamount, affectedlanes, lanes):
         inst.set_laneinst_at(laneid, relpeid)
     return inst
 
+
 def gen_read_inst():
     return Meminst("read")
+
 
 def writeTo(path, s):
     with open(path, 'w') as f:
@@ -141,11 +144,13 @@ opbin = {
 def gen_ns_bin(ns):
     return format(nsbin[ns], '0' + str(namespace_bits) + 'b')
 
+
 def gen_singlelane_bin(lane):
     peid = lane["relpe"]
     valid = lane["valid"]
     bin_str = format(peid, '0' + str(peid_bits) + 'b') + format(valid, '0' + str(valid_bits) + 'b')
     return bin_str
+
 
 def gen_lanes_bin(lanes):
     bin = ''
@@ -154,8 +159,10 @@ def gen_lanes_bin(lanes):
     bin += gen_ns_bin("data")
     return bin
 
+
 def gen_opcode_bin(op):
     return format(opbin[op], '0' + str(opcode_bits) + 'b')
+
 
 def gen_shift_bin(shift):
     return format(shift, '0' + str(shift_bits) + 'b')

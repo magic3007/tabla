@@ -16,7 +16,6 @@ def init_data(m):
 
 class AXI:
     size = axi_size
-    #cycle = 0
     
     def __init__(self):
         self.lanes = []
@@ -69,12 +68,15 @@ def get_data_allaxi_cycle(cycl, axi_list):
     alldata = []
     for axi in axi_list:
         if cycl >= len(axi.data_by_cycle):
-            alldata.append([])
+            #alldata.append([])
+            continue
         else:
-            alldata.append(axi.data_by_cycle[cycl])
+            #alldata.append(axi.data_by_cycle[cycl])
+            alldata.extend(axi.data_by_cycle[cycl])
     return alldata
 
 
+# probably won't need this function
 def get_data_allaxi(maxcycle, axi_list):
     data = []
     for i in range(maxcycle):
@@ -98,7 +100,9 @@ if __name__ == '__main__':
     assign_axi(data, axi_list)
     divide_axidata_by_cycle(axi_list)
     maxcycle = get_maxcycle(axi_list)
-    alldata = get_data_allaxi(maxcycle, axi_list)
-    
+    #alldata = get_data_allaxi(maxcycle, axi_list)
+    for i in range(maxcycle):
+        data_read = get_data_allaxi_cycle(i, axi_list)
+        print("cycle ", i, ": ", data_read)
     
     
