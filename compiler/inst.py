@@ -146,7 +146,7 @@ def generate_inst(node_graph, pe_per_pu):
                         dests.append(Dest(namespace_id, str(index), child.id))
                     inst.dests = dests
                     node.inst.append(inst)
-            else: # non-source noes
+            else: # non-source nodes
                 if len(node.children) > 1: # multiple target PEs
                     multicast(node, pe_per_pu)
                 else: # single target PE
@@ -159,8 +159,11 @@ def generate_inst(node_graph, pe_per_pu):
                         for p in node.parents:
                             if p.outDataType == "model":
                                 child_node = p
+                                model_parent = p
                                 break
-                        dst = get_dest(node.pe, child_node.pe, pe_per_pu, node)
+                        #dst = get_dest(node.pe, child_node.pe, pe_per_pu, node)
+                        index = model_parent.inst[0].dests[0].index
+                        dst = Dest("NW", str(index))
                         dests = []
                         dests.append(dst)
                         fill_null(dests, isdst=True)
@@ -473,8 +476,7 @@ def get_dest(curr_pe, child_pe, pe_per_pu, node=None):
     and the index.
     '''
     if curr_pe.id == child_pe.id: # no inter-PE communication required
-        out_data_type = node.outDataType
-        namespace_id = data_type_to_ns[out_data_type]
+        namespace_id = data_type_to_ns[node.outDataType]
         namespace = curr_pe.namespace_map[namespace_id]
         #if namespace.tail >= 0:
         if namespace.isfull():
