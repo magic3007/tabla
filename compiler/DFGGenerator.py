@@ -59,7 +59,8 @@ class DFGGenerator:
             if len(iterList) is 0:
                 mult = DFGNode()
                 mult.operation = "*"
-                mult.dataType = 'gradient'
+                #mult.dataType = 'gradient'
+                mult.dataType = None
                 self.dfg.add(mult)
                 self.connectNode(self.symTable[g], mult)
                 self.connectNode(symTable["mu"], mult)
@@ -78,7 +79,8 @@ class DFGGenerator:
                         if gSym in self.symTable:
                             mult = DFGNode()
                             mult.operation = "*"
-                            mult.dataType = 'gradient'
+                            #mult.dataType = 'gradient'
+                            mult.dataType = None
                             self.dfg.add(mult)
                             self.connectNode(self.symTable[gSym], mult)
                             self.connectNode(self.symTable["mu"], mult)
@@ -96,7 +98,8 @@ class DFGGenerator:
                             if gSym in self.symTable:
                                 mult = DFGNode()
                                 mult.operation = "*"
-                                mult.dataType = 'gradient'
+                                #mult.dataType = 'gradient'
+                                mult.dataType = None
                                 self.dfg.add(mult)
                                 self.connectNode(self.symTable[gSym], mult)
                                 self.connectNode(self.symTable["mu"], mult)
@@ -184,7 +187,8 @@ class DFGGenerator:
                     print('debug...statTraversal...var type is: ', type(var))
                     print('debug...statTraversal...gradientTable is: ', self.gradientTable)
                     if var in self.gradientTable:
-                        resultNode.dataType = 'gradient'
+                        #resultNode.dataType = 'gradient'
+                        resultNode.dataType = None
                     
                     self.symTable[var + '[' + str(i) + ']'] = resultNode
                     arr.append(resultNode)
