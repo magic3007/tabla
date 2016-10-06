@@ -21,9 +21,12 @@ def read_config(filename):
     return json.loads(contents)
 
 def genpus(num_pes, pes_per_pu, ns_size, ns_int_size):
+    '''
+    Instantiates the PE's and PU's based on the config file.
+    '''
     pu_list = []
     pe_list = []
-    num_pus = num_pes // pes_per_pu # assum num_pes is a power of 2 for now
+    num_pus = num_pes // pes_per_pu
 
     for i in range(num_pus):
         pu_list.append(Pu(i))
@@ -53,6 +56,7 @@ def genpus(num_pes, pes_per_pu, ns_size, ns_int_size):
             pe.prev = pe_list[i + 1]
             pe.next = pe_list[i - 1]
             pe_count += 1
+
     return (pu_list, pe_list)
 
 

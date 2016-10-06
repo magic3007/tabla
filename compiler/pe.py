@@ -9,7 +9,7 @@ class Pe:
         self.prev = prev
         self.inst = []
         self.cycle = 0
-        self.pu = pu
+        self.pu = pu # PU to which this PE belongs
         self.nw = Namespace("NW", ns_size)
         self.nd = Namespace("ND", ns_size)
         self.ng = Namespace("NG", ns_size)

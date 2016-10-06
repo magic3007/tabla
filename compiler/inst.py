@@ -125,7 +125,7 @@ def generate_inst(node_graph, pe_per_pu):
     nodes = node_graph.get_nodes_in_cycle(cycl)
     while len(nodes) > 0:
         for node in nodes:
-            if node.parents == ["Source"]:
+            if node.parents == ["Source"]: # initial data nodes
                 inst = Inst()
                 dests = []
                 if node.pe is None: # constants without pe assignment
@@ -164,7 +164,7 @@ def generate_inst(node_graph, pe_per_pu):
                         dests = []
                         dests.append(dst)
                         fill_null(dests, isdst=True)
-                        inst = Inst(node.op, dsts, srcs)
+                        inst = Inst(node.op, dests, srcs)
                         node.pe.add_inst(inst)
                         node.inst.append(inst)
                         continue # move on to next node instr generation
