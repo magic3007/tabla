@@ -5,6 +5,7 @@ sys.path.insert(0, 'include')
 import os
 import argparse
 import json
+import math
 from TablaLexer import TablaLexer
 from TablaParser import TablaParser
 from DFGGenerator import DFGGenerator
@@ -125,18 +126,6 @@ def main(argv):
     #dfg = inst.readFrom("./artifacts/nodes_ir.json")
     inst.generate_inst(dfg, pes_per_pu)
 
-    # initialize
-    bits = {
-        'NUM_PE_VALID': 0,
-        'INDEX_INST': 0,
-        'INDEX_DATA': 0,
-        'INDEX_WEIGHT': 0,
-        'INDEX_META': 0,
-        'INDEX_INTERIM': 0,
-        'INDEX_IN_INST': 0
-    }
-    gen_configfile(bits)
-
     for pe in pe_list:
         #print("pe id: ", pe.id)
         if len(pe.inst) > 0:
@@ -157,9 +146,42 @@ def main(argv):
     ninst_max = fileformat.get_maxinst(bin_files)
     fileformat.formatf(ninst_max, bin_files)
     
+    # initialize
+    bits = {
+        'NUM_PE_VALID': 0,
+        'INDEX_INST': 0,
+        'INDEX_DATA': 0,
+        'INDEX_WEIGHT': 0,
+        'INDEX_META': 0,
+        'INDEX_INTERIM': 0,
+        'INDEX_IN_INST': 0
+    }
+    bits['NUM_PE_VALID'] = len(node_ir.pe_used)
+    bits['INDEX_INST'] = fileformat.getdepth(ninst_max)
+    bits['INDEX_DATA'] = get_maxns(pe_list, 'ND')
+    bits['INDEX_WEIGHT'] = get_maxns(pe_list, 'NW')
+    bits['INDEX_META'] = get_maxns(pe_list, 'NM')
+    bits['INDEX_INTERIM'] = get_maxns(pe_list, 'NI')
+    bits['INDEX_IN_INST'] = config['index_bit']
+    
+    gen_configfile(bits)
+
+
+
+def get_maxns(pe_list, namespace):
+    maxns = 0
+    for pe in pe_list:
+        ns = pe.namespace_map[namespace]
+        #print(ns.tail, maxns)
+        if ns.tail > maxns:
+            maxns = ns.tail
+    if maxns == 1:
+        maxns += 1 # hacky way to make log2 greater than 0
+    return math.ceil(math.log2(maxns))
 
 
 def gen_configfile(bits):
+    #print(bits)
     num_pe_valid = 'NUM_PE_VALID {:d}'.format(bits['NUM_PE_VALID'])
     index_inst = 'INDEX_INST {:d}'.format(bits['INDEX_INST'])
     index_data = 'INDEX_DATA {:d}'.format(bits['INDEX_DATA'])

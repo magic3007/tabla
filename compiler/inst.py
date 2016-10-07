@@ -59,7 +59,7 @@ class Inst:
     def toDict(self):
         d = {}
         d["op"] = self.op
-        print("DEBUG ", self.dests)
+        #print("DEBUG ", self.dests)
         d["dests"] = [dest.toDict() for dest in self.dests] if self.dests is not None else None
         #print("DEBUG ", self.srcs)
         #d["srcs"] = [src.toDict() for src in self.srcs] if self.srcs is not None else None
@@ -89,7 +89,7 @@ class Inst:
                 dests.append(dest)
             self.dests = dests
             srcs = []
-            print(d)
+            #print(d)
             if d["srcs"] is not None:
                 for src_d in d["srcs"]:
                     src = Source()
