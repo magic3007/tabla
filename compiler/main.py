@@ -124,10 +124,23 @@ def main(argv):
 
     #dfg = inst.readFrom("./artifacts/nodes_ir.json")
     inst.generate_inst(dfg, pes_per_pu)
+
+    # initialize
+    bits = {
+        'NUM_PE_VALID': 0,
+        'INDEX_INST': 0,
+        'INDEX_DATA': 0,
+        'INDEX_WEIGHT': 0,
+        'INDEX_META': 0,
+        'INDEX_INTERIM': 0,
+        'INDEX_IN_INST': 0
+    }
+    gen_configfile(bits)
+
     for pe in pe_list:
-        print("pe id: ", pe.id)
+        #print("pe id: ", pe.id)
         if len(pe.inst) > 0:
-            print("pe inst len: ", len(pe.inst))
+            #print("pe inst len: ", len(pe.inst))
             pe.print_inst()
 
     binary.op_bit = config["op_bit"]
@@ -145,6 +158,26 @@ def main(argv):
     fileformat.formatf(ninst_max, bin_files)
     
 
+
+def gen_configfile(bits):
+    num_pe_valid = 'NUM_PE_VALID {:d}'.format(bits['NUM_PE_VALID'])
+    index_inst = 'INDEX_INST {:d}'.format(bits['INDEX_INST'])
+    index_data = 'INDEX_DATA {:d}'.format(bits['INDEX_DATA'])
+    index_weight = 'INDEX_WEIGHT {:d}'.format(bits['INDEX_WEIGHT'])
+    index_meta = 'INDEX_META {:d}'.format(bits['INDEX_META'])
+    index_interim = 'INDEX_INTERIM {:d}'.format(bits['INDEX_INTERIM'])
+    index_in_inst = 'INDEX_IN_INST {:d}'.format(bits['INDEX_IN_INST'])
+
+    templ = num_pe_valid + '\n' + \
+            index_inst + '\n' + \
+            index_data + '\n' + \
+            index_weight + '\n' + \
+            index_meta + '\n' + \
+            index_interim + '\n' + \
+            index_in_inst
+    with open('config.list', 'w') as f:
+        f.write(templ)
+    
 
 def writeTo(path, s):
     with open(path, 'w') as f:
