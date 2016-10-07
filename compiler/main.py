@@ -13,12 +13,14 @@ from Scheduler import Scheduler
 import node_ir, inst, binary
 from pu import Pu
 from pe import Pe
+import fileformat
 
 
 def read_config(filename):
     with open(filename, 'r') as f:
         contents = f.read()
     return json.loads(contents)
+
 
 def genpus(num_pes, pes_per_pu, ns_size, ns_int_size):
     '''
@@ -123,8 +125,10 @@ def main(argv):
     #dfg = inst.readFrom("./artifacts/nodes_ir.json")
     inst.generate_inst(dfg, pes_per_pu)
     for pe in pe_list:
-        print(pe.id)
-        pe.print_inst()
+        print("pe id: ", pe.id)
+        if len(pe.inst) > 0:
+            print("pe inst len: ", len(pe.inst))
+            pe.print_inst()
 
     binary.op_bit = config["op_bit"]
     binary.ns_bit = config["ns_bit"]
@@ -134,6 +138,11 @@ def main(argv):
         insts = binary.readFrom("./inst/" + f)
         b = binary.generate_bin(insts)
         binary.writeTo(f, b, config["hex"])
+
+    # append zeros to each binary file
+    bin_files = [os.path.join("./bin/", f) for f in os.listdir("./bin/")]
+    ninst_max = fileformat.get_maxinst(bin_files)
+    fileformat.formatf(ninst_max, bin_files)
     
 
 
