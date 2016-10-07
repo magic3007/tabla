@@ -115,12 +115,12 @@ def main(argv):
     dfg.writeTo("./artifacts/nodes_ir.json")
 
     # record active pe's
-    writeTo('./active_pes.json', node_ir.pe_used)
+    writeTo('./artifacts/active_pes.json', node_ir.pe_used)
 
     # get SIG, DIV stuff
     special_modules = ['sigmoid', '/', '#', '*+', '$']
     mods = node_ir.get_special_modules(dfg, special_modules)
-    writeTo('./special_modules.json', mods)
+    writeTo('./artifacts/special_modules.json', mods)
 
     #dfg = inst.readFrom("./artifacts/nodes_ir.json")
     inst.generate_inst(dfg, pes_per_pu)

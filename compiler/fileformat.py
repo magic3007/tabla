@@ -2,7 +2,7 @@ import os
 import math
 
 
-ninst_max = 0
+#ninst_max = 0
 ninst = 0
 EXTRA_ZERO = 1
 
@@ -39,6 +39,7 @@ def writeTo(path, string):
 
 
 def get_maxinst(bin_files):
+    ninst_max = 0
     for bf in bin_files:
         s = readFrom(bf)
         ninst = get_ninst(s)
