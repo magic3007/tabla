@@ -262,11 +262,11 @@ def classify_initial_nodes(node_graph):
 pe_used = []
 
 def assign_pe_initial(xy_nodes, w_nodes, num_pes, ns_size, ns_int_size, pu_pe):
-    """ 
-    This anchors pe's to both x y's and w's in the beginning.
-    Also returns a list of PE id's that are used ("active")
-    """
-    
+    '''
+    For each input (x's and y's) and weight data, this function assigns a PE.
+    We call this "anchoring".
+    This function also returns a list of PE id's that are used ("active")
+    '''
     pe_list = pu_pe[1]
     if len(w_nodes) and len(xy_nodes):
         fill_ynodes = True
