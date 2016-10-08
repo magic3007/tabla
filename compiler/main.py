@@ -25,7 +25,7 @@ def read_config(filename):
 
 def genpus(num_pes, pes_per_pu, ns_size, ns_int_size):
     '''
-    Instantiates the PE's and PU's based on the config file.
+    Instantiates both PU's and PE's, based on the config file.
     '''
     pu_list = []
     pe_list = []
@@ -42,7 +42,11 @@ def genpus(num_pes, pes_per_pu, ns_size, ns_int_size):
         if i % pes_per_pu == 0:
             pu.head_pe = pe
 
-    pe_count = 0
+    pu_list[0].next_pu = pu_list[-1]
+    for i, pu in enumerate(pu_list[1:]): # kind of hacky
+        pu.next_pu = pu_list[i]
+
+    pe_count = 0 # index of PE in PU
     pu_count = 0
     for i, pe in enumerate(pe_list):
         if i % pes_per_pu == 0:
