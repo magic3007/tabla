@@ -4,6 +4,7 @@ from node_ir import Node, NodeGraph
 from pe import Pe
 from namespace import Ns_entry
 
+
 class Dest:
     def __init__(self, namespace=None, index=None, dest_node_id=None):
         self.namespace = namespace
@@ -41,6 +42,7 @@ class Source:
     def fromDict(self, d):
         self.namespace = d["src_nid"]
         self.index = d["src_index"]
+
 
 class Inst:
     def __init__(self, op=None, dests=None, srcs=None):
@@ -209,14 +211,17 @@ def generate_inst(node_graph, pe_per_pu):
                                 headpe.add_inst(inst)
                                 node.inst.append(inst)
                                 parentpe_imm = headpe
-                            # STEP 3: send from repr pe to target repr
+                            # STEP 3: send from repr pe to target pe
                             if childnode.pe != target_headpe:
                                 dst = get_dest(target_headpe, childnode.pe, pe_per_pu)
                                 dst.dest_node_id = childnode.id
                                 dsts  = []
                                 dsts.append(dst)
                                 fill_null(dsts, isdst=True)
-                                src = Source(namespace="NB", index=str(parentpe_imm.id) + "1") # id of pe where data originally came from
+                                if parentpe_imm.pu.next_pu.id == childnode.pe.pu.id:
+                                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "0")
+                                else:
+                                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "1") # id of pe where data originally came from
                                 srcs = []
                                 srcs.append(src)
                                 fill_null(srcs, isdst=False)
@@ -249,7 +254,7 @@ def fill_null(dst_or_src, isdst):
 
     
 def determine_target_ns(curr_pe, target_pe, node):
-    if curr_pe == target_pe:
+    if curr_pe.id == target_pe.id:
         return data_type_to_ns[node.outDataType]
     elif curr_pe.next == target_pe:
         return "NN0" # PE Neighbor
@@ -410,7 +415,10 @@ def multicast(node, pe_per_pu):
                 dsts.append(dst)
                 fill_null(dsts, isdst=True)
 
-                src = Source(namespace="NB", index=str(parentpe_imm.id) + "1") # id of pe where data originally came from
+                if parentpe_imm.pu.next_pu.id == target_headpe.pu.id:
+                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "0")
+                else:
+                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "1") # id of pe where data originally came from
                 srcs = []
                 srcs.append(src)
                 fill_null(srcs, isdst=False)
@@ -471,9 +479,9 @@ def in_use(entry, dests):
 #def get_dest(node, child_node, pe_per_pu):
 def get_dest(curr_pe, child_pe, pe_per_pu, node=None):
     '''
-    This function returns a Dest object required in an instruction.
+    This function returns a Dest object required in a valid instruction.
     Given current PE id and target PE id, it determines the namespace id
-    and the index.
+    and the index in the namespace.
     '''
     if curr_pe.id == child_pe.id: # no inter-PE communication required
         namespace_id = data_type_to_ns[node.outDataType]
@@ -486,7 +494,7 @@ def get_dest(curr_pe, child_pe, pe_per_pu, node=None):
         namespace.insert(namespace.tail, Ns_entry()) # dummy insertion just to keep track of the free index in the namespace
         return Dest(namespace_id, str(index))
     elif curr_pe.pu.id == child_pe.pu.id: # inter-PE communication
-        if curr_pe.next == child_pe:
+        if curr_pe.next.id == child_pe.id:
             namespace = curr_pe.namespace_map["NN0_out"]
             namespace.insert(namespace.tail, Ns_entry())
             return Dest("NN", str(child_pe.id) + "0")  # Neighbor PE: NN[0]
@@ -495,9 +503,14 @@ def get_dest(curr_pe, child_pe, pe_per_pu, node=None):
             namespace.insert(namespace.tail, Ns_entry())
             return Dest("NB", str(child_pe.id) + "0") # PE bus: NB[0]
     else: # inter-PU communication - only time this is called is sending between two representative PEs
-        namespace = curr_pe.namespace_map["NB1_out"]
-        namespace.insert(namespace.tail, Ns_entry())
-        return Dest("NB", str(child_pe.id) + "1")
+        if curr_pe.pu.next_pu.id == child_pe.pu.id:
+            namespace = curr_pe.namespace_map["NB0_out"]
+            namespace.insert(namespace.tail, Ns_entry())
+            return Dest("NB", str(child_pe.id) + "0")
+        else:
+            namespace = curr_pe.namespace_map["NB1_out"]
+            namespace.insert(namespace.tail, Ns_entry())
+            return Dest("NB", str(child_pe.id) + "1")
 
 
 def get_src(node, parent_node, pe_per_pu):

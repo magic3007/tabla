@@ -107,7 +107,7 @@ def main(argv):
     ns_size = config["namespace_size"]
     ns_int_size = config["namespace_interim_size"]
 
-    # generate PU's and PE's based on config valeuse
+    # generate PU's and PE's based on config values
     print('*' * 20)
     pu_list, pe_list = genpus(num_pes, pes_per_pu, ns_size, ns_int_size)
     pu_pe = (pu_list, pe_list)
@@ -128,6 +128,7 @@ def main(argv):
     writeTo('./artifacts/special_modules.json', mods)
 
     #dfg = inst.readFrom("./artifacts/nodes_ir.json")
+    # instruction generation
     inst.generate_inst(dfg, pes_per_pu)
 
     for pe in pe_list:
@@ -150,7 +151,7 @@ def main(argv):
     ninst_max = fileformat.get_maxinst(bin_files)
     fileformat.formatf(ninst_max, bin_files)
     
-    # initialize
+    # needed for config.list file
     bits = {
         'NUM_PE_VALID': 0,
         'INDEX_INST': 0,
