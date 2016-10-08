@@ -15,6 +15,7 @@ import node_ir, inst, binary
 from pu import Pu
 from pe import Pe
 import fileformat
+import mem_interface
 
 
 def read_config(filename):
@@ -170,6 +171,10 @@ def main(argv):
     bits['INDEX_IN_INST'] = config['index_bit']
     
     gen_configfile(bits)
+
+    # generate memory instructions
+    m = dfgGenerator.constTable['m']
+    mem_interface.gen_meminst(m)
 
 
 

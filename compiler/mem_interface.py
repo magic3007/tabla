@@ -171,7 +171,7 @@ def gen_shift_bin(shift):
 
 
 # these two variables determine how many read instructions are required
-m = 200 # model size - basically total number of data read in each iteration
+#m = 200 # model size - basically total number of data read in each iteration
 axi_size = 64 # number of data elements read by each AXI
 axi_read_cycl = 4 # number of data elements read in one cycle
 
@@ -197,7 +197,7 @@ axi3 = AXI()
 axi_list = [axi0, axi1, axi2, axi3]
 
 
-def assign_axi(data, axi_list):
+def assign_axi(data, axi_list, m):
     q = m // axi_size
     r = m % axi_size
     for i in range(q):
@@ -250,11 +250,44 @@ def get_maxcycle(axi_list):
     return maxcycle
 
 
+def gen_meminst(m):
+    '''
+    This function gets called by the main compiler routine.
+    '''
+    data = init_data(m) # data set in one iteration (e.g. x[0] ... x[63])
+    assign_axi(data, axi_list, m)
+    divide_axidata_by_cycle(axi_list)
+    maxcycle = get_maxcycle(axi_list)
+
+    lanes = init_lanes(nlanes, pes_per_lane)
+    instrs = []
+
+    for i in range(maxcycle):
+        instrs.append(gen_read_inst())
+        data_read = get_data_allaxi_cycle(i, axi_list)
+        print("cycle ", i, ": ", data_read)
+        lanesbyshift = get_lanesbyshift(data_read)
+        #print("lanes by shift: ", lanesbyshift)
+        for shiftamount in lanesbyshift:
+            affectedlanes = lanesbyshift[shiftamount]
+            inst = gen_shift_inst(shiftamount, affectedlanes, lanes)
+            instrs.append(inst)
+    instrs.append(gen_wfi_inst())
+    instrs.append(gen_loop_inst())
+    writeTo("./meminst.json", json.dumps([i.toDict() for i in instrs], sort_keys=False, indent=2))
+
+    binary = ''
+    for inst in instrs:
+        b = gen_lanes_bin(inst.lanes) + gen_opcode_bin(inst.op) + gen_shift_bin(inst.shiftamount)
+        binary += b + '\n'
+    writeTo('./meminst.txt', binary)
+
+
 
 if __name__ == "__main__":
     m = int(sys.argv[1])
     data = init_data(m) # data set in one iteration (e.g. x[0] ... x[63])
-    assign_axi(data, axi_list)
+    assign_axi(data, axi_list, m)
     divide_axidata_by_cycle(axi_list)
     maxcycle = get_maxcycle(axi_list)
 
