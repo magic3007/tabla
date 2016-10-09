@@ -174,8 +174,20 @@ def main(argv):
 
     # generate memory instructions
     m = dfgGenerator.constTable['m']
+    modelout = count_modeloutput(dfgGenerator.symTable)
+    print('model output count: {:d}'.format(modelout))
+    m += modelout
     mem_interface.gen_meminst(m)
 
+
+
+def count_modeloutput(sym_table):
+    model_output_count = 0
+    for sym in sym_table:
+        dfgnode = sym_table[sym]
+        if dfgnode.dataType == 'model_output':
+            model_output_count += 1
+    return model_output_count
 
 
 def get_maxns(pe_list, namespace):
@@ -214,6 +226,8 @@ def gen_configfile(bits):
 def writeTo(path, s):
     with open(path, 'w') as f:
         f.write(json.dumps(s, sort_keys=False, indent=2))
+
+
             
 if __name__ == '__main__':
     main(sys.argv)
