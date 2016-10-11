@@ -176,7 +176,7 @@ def generate_inst(node_graph, pe_per_pu):
                     else:
                         childnode = node.children[0] # children is always type list
                         targetns = determine_target_ns(node.pe, childnode.pe, node)
-                        if targetns == "NB1": # e.g. a PE in some PU to another PE in different PU - 3 steps needed
+                        if targetns == "NB1" or targetns == 'NN1': # e.g. a PE in some PU to another PE in different PU - 3 steps needed
                             headpe = node.pe.pu.head_pe
                             # STEP 1: send to representative pe
                             if node.pe != headpe:
@@ -188,10 +188,22 @@ def generate_inst(node_graph, pe_per_pu):
                                 node.pe.add_inst(inst)
                                 node.inst.append(inst)
                                 parentpe_imm = node.pe
+
                             # STEP 2: send from src repr PE to target repr PE
                             target_headpe = childnode.pe.pu.head_pe
+                            ''' Fix: Inter-PU communication needs PU ID instead of PE ID
                             dst = get_dest(headpe, target_headpe, pe_per_pu) # first need to send to repr target pe
-                            dst.dest_node_id = childnode.id if childnode.pe == target_headpe else None
+                            '''
+                            if headpe.pu.next_pu.id == target_headpe.pu.id:
+                                namespace = headpe.namespace_map["NB0_out"]
+                                namespace.insert(namespace.tail, Ns_entry())
+                                dst = Dest("NN", str(target_headpe.pu.id) + "1")
+                            else:
+                                namespace = headpe.namespace_map["NB1_out"]
+                                namespace.insert(namespace.tail, Ns_entry())
+                                dst = Dest("NB", str(target_headpe.pu.id) + "1")
+                            
+                            dst.dest_node_id = childnode.id if childnode.pe.id == target_headpe.id else None
                             dsts = []
                             dsts.append(dst)
                             fill_null(dsts, isdst=True)
@@ -206,11 +218,17 @@ def generate_inst(node_graph, pe_per_pu):
                                 inst = Inst("pass", dsts, srcs)
                                 headpe.add_inst(inst)
                                 node.inst.append(inst)
+                                parentpu = headpe.pu
                             else:
                                 inst = Inst(node.op, dsts, srcs)
                                 headpe.add_inst(inst)
                                 node.inst.append(inst)
                                 parentpe_imm = headpe
+                                '''
+                                fix: need PU ID
+                                '''
+                                parentpu = parentpe_imm.pu
+
                             # STEP 3: send from repr pe to target pe
                             if childnode.pe != target_headpe:
                                 dst = get_dest(target_headpe, childnode.pe, pe_per_pu)
@@ -218,10 +236,10 @@ def generate_inst(node_graph, pe_per_pu):
                                 dsts  = []
                                 dsts.append(dst)
                                 fill_null(dsts, isdst=True)
-                                if parentpe_imm.pu.next_pu.id == childnode.pe.pu.id:
-                                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "0")
+                                if parentpu.next_pu.id == childnode.pe.pu.id:
+                                    src = Source(namespace="NB", index=str(parentpu.id) + "0")
                                 else:
-                                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "1") # id of pe where data originally came from
+                                    src = Source(namespace="NB", index=str(parentpu.id) + "1") # id of pe where data originally came from
                                 srcs = []
                                 srcs.append(src)
                                 fill_null(srcs, isdst=False)
@@ -240,6 +258,7 @@ def generate_inst(node_graph, pe_per_pu):
                             inst = Inst(node.op, dsts, srcs)
                             node.pe.add_inst(inst)
                             node.inst.append(inst)
+
         cycl += 1
         nodes = node_graph.get_nodes_in_cycle(cycl)
 
@@ -353,6 +372,7 @@ def multicast(node, pe_per_pu):
                             dst = get_dest(curr_pe, dst, pe_per_pu)
                             dst.dest_node_id = entry[1].id
                             dests_by_cycle[i] = dst
+                            parentpe_imm = curr_pe
                         else:
                             dst = get_dest(curr_pe, dst, pe_per_pu, node)
                             dst.dest_node_id = entry[1].id
@@ -375,7 +395,18 @@ def multicast(node, pe_per_pu):
                 srcs.append(src)
                 fill_null(srcs, isdst=False)
 
-                dst = get_dest(headpe, target_headpe, pe_per_pu) # first need to send to repr target pe
+                '''
+                fix: dest id should be PU ID
+                '''
+                #dst = get_dest(headpe, target_headpe, pe_per_pu) # first need to send to repr target pe
+                if headpe.pu.next_pu.id == target_headpe.pu.id:
+                    namespace = headpe.namespace_map["NB0_out"]
+                    namespace.insert(namespace.tail, Ns_entry())
+                    dst = Dest("NN", str(target_headpe.pu.id) + "1")
+                else:
+                    namespace = headpe.namespace_map["NB1_out"]
+                    namespace.insert(namespace.tail, Ns_entry())
+                    dst = Dest("NB", str(target_headpe.pu.id) + "1")
                 dst.dest_node_id = target_node.id if target == target_headpe else None
                 dsts = []
                 dsts.append(dst)
@@ -385,16 +416,30 @@ def multicast(node, pe_per_pu):
                 headpe.add_inst(inst)
                 node.inst.append(inst)
                 parentpe_imm = headpe
+                parentpu = parentpe_imm.pu
             else:
                 for i, entry in enumerate(dests_by_cycle):
                     if type(entry) == tuple:
                         dst = entry[0]
                         ns = determine_target_ns(curr_pe, dst, node)
-                        if ns == "NB1":
-                            dst = get_dest(curr_pe, headpe, pe_per_pu, node)
+                        if ns == "NB1" or "NN1":
+                            '''
+                            fix: dest ID should be PU ID
+                            '''
+                            #dst = get_dest(curr_pe, headpe, pe_per_pu, node)
+                            if dst.pu.next_pu.id == target_headpe.pu.id:
+                                namespace = dst.namespace_map["NB0_out"]
+                                namespace.insert(namespace.tail, Ns_entry())
+                                dst = Dest("NB", str(target_headpe.pu.id) + "0")
+                            else:
+                                namespace = dst.namespace_map["NB1_out"]
+                                namespace.insert(namespace.tail, Ns_entry())
+                                dst = Dest("NB", str(target_headpe.pu.id) + "1")
+                                
                             dst.dest_node_id = target_node.id if target == target_headpe else None
                             dests_by_cycle[i] = dst
                             parentpe_imm = headpe
+                            parentpu = parentpe_imm.pu
                         elif ns == "NB0" or ns == "NN0":
                             dst = get_dest(curr_pe, dst, pe_per_pu, node)
                             dst.dest_node_id = target_node.id if target == target_headpe else None
@@ -415,10 +460,10 @@ def multicast(node, pe_per_pu):
                 dsts.append(dst)
                 fill_null(dsts, isdst=True)
 
-                if parentpe_imm.pu.next_pu.id == target_headpe.pu.id:
-                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "0")
+                if parentpu.next_pu.id == target_headpe.pu.id:
+                    src = Source(namespace="NB", index=str(parentpu.id) + "0")
                 else:
-                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "1") # id of pe where data originally came from
+                    src = Source(namespace="NB", index=str(parentpu.id) + "1") # id of pe where data originally came from
                 srcs = []
                 srcs.append(src)
                 fill_null(srcs, isdst=False)
@@ -522,8 +567,12 @@ def get_src(node, parent_node, pe_per_pu):
             if dest.dest_node_id == node.id:
                 ns = dest.namespace
                 if ns == "NB" or ns == "NN":
-                    src_pe = find_src_pe(node.pe, parent_node.pe)
-                    return Source(dest.namespace, str(src_pe.id) + dest.index[-1])
+                    if dest.index[-1] == '1':
+                        src_pu = find_src_pe(node.pe, parent_node.pe)
+                        return Source(dest.namespace, str(src_pu.id) + dest.index[-1])
+                    elif dest.index[-1] == '0':
+                        src_pe = find_src_pe(node.pe, parent_node.pe)
+                        return Source(dest.namespace, str(src_pe.id) + dest.index[-1])
                 else:
                     if dest.namespace == "NM":
                         ns = node.pe.namespace_map[dest.namespace]
@@ -537,7 +586,8 @@ def find_src_pe(node_pe, parent_node_pe):
     # assuming these are different pes
     if node_pe.pu != parent_node_pe.pu:
         if node_pe == node_pe.pu.head_pe:
-            return parent_node_pe.pu.head_pe
+            #return parent_node_pe.pu.head_pe
+            return parent_node_pe.pu
         else:
             return node_pe.pu.head_pe
     else:

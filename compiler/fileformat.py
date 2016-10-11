@@ -48,6 +48,15 @@ def get_maxinst(bin_files):
     return ninst_max
 
 
+def get_maxsize(bin_files):
+    maxsize = 0
+    for bf in bin_files:
+        size = os.path.getsize(bf)
+        if size > maxsize:
+            maxsize = size
+    return maxsize
+
+
 def formatf(ninst_max, bin_files):
     depth = getdepth(ninst_max)
     for bf in bin_files:
@@ -57,3 +66,4 @@ def formatf(ninst_max, bin_files):
         diff = numzeros - ninst
         s = appendzeros(s, diff)
         writeTo(bf, s)
+

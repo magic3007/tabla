@@ -120,14 +120,6 @@ def main(argv):
     node_ir.assign_pes(dfg, num_pes, schedule, ns_size, ns_int_size, pu_pe)
     dfg.writeTo("./artifacts/nodes_ir.json")
 
-    # record active pe's
-    writeTo('./artifacts/active_pes.json', node_ir.pe_used)
-
-    # get SIG, DIV stuff
-    special_modules = ['sigmoid', '/', '#', '*+', '$']
-    mods = node_ir.get_special_modules(dfg, special_modules)
-    writeTo('./artifacts/special_modules.json', mods)
-
     #dfg = inst.readFrom("./artifacts/nodes_ir.json")
     # instruction generation
     inst.generate_inst(dfg, pes_per_pu)
@@ -151,6 +143,13 @@ def main(argv):
     bin_files = [os.path.join("./bin/", f) for f in os.listdir("./bin/")]
     ninst_max = fileformat.get_maxinst(bin_files)
     fileformat.formatf(ninst_max, bin_files)
+
+    # get the file with max number of instructions and its size
+    with open('inst_info.txt', 'w') as f:
+        f.write('MAX_INST_NUM: ' + str(fileformat.get_maxinst(bin_files)))
+        f.write('\n')
+        f.write('MAX_FILE_SIZE: ' + str(fileformat.get_maxsize(bin_files)))
+    
     
     # needed for config.list file
     bits = {
@@ -170,7 +169,18 @@ def main(argv):
     bits['INDEX_INTERIM'] = get_maxns(pe_list, 'NI')
     bits['INDEX_IN_INST'] = config['index_bit']
     
-    gen_configfile(bits)
+    gen_configfile('config.list', bits)
+    
+    # record active pe's
+    writeTo('./artifacts/active_pes.json', node_ir.pe_used)
+
+    # get SIG, DIV stuff
+    special_modules = ['sigmoid', '/', '#', '*+', '$']
+    mods = node_ir.get_special_modules(dfg, special_modules)
+    writeTo('./artifacts/special_modules.json', mods)
+    with open('config.list', 'a') as f:
+        for special_mod in mods:
+            f.write('\n' + special_mod)
 
     # generate memory instructions
     m = dfgGenerator.constTable['m']
@@ -202,7 +212,7 @@ def get_maxns(pe_list, namespace):
     return math.ceil(math.log2(maxns))
 
 
-def gen_configfile(bits):
+def gen_configfile(path, bits):
     #print(bits)
     num_pe_valid = 'NUM_PE_VALID {:d}'.format(bits['NUM_PE_VALID'])
     index_inst = 'INDEX_INST {:d}'.format(bits['INDEX_INST'])
@@ -219,7 +229,7 @@ def gen_configfile(bits):
             index_meta + '\n' + \
             index_interim + '\n' + \
             index_in_inst
-    with open('config.list', 'w') as f:
+    with open(path, 'w') as f:
         f.write(templ)
     
 
