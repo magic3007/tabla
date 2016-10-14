@@ -82,7 +82,7 @@ def main(argv):
     tree = parser.program()   # 'program' is the starting rule. The parser is invoked by calling the starting rule.
     
     # graph creation should happen here
-    print('\n\n================================')
+    #print('\n\n================================')
     dfg_file = 'artifacts/dfg.json'
     dfgGenerator = DFGGenerator()
     dfg = dfgGenerator.create(tree)
@@ -109,7 +109,7 @@ def main(argv):
     ns_int_size = config["namespace_interim_size"]
 
     # generate PU's and PE's based on config values
-    print('*' * 20)
+    #print('*' * 20)
     pu_list, pe_list = genpus(num_pes, pes_per_pu, ns_size, ns_int_size)
     pu_pe = (pu_list, pe_list)
 
@@ -150,7 +150,6 @@ def main(argv):
         f.write('\n')
         f.write('MAX_FILE_SIZE: ' + str(fileformat.get_maxsize(bin_files)))
     
-    
     # needed for config.list file
     bits = {
         'NUM_PE_VALID': 0,
@@ -183,11 +182,14 @@ def main(argv):
             f.write('\n' + special_mod)
 
     # generate memory instructions
-    m = dfgGenerator.constTable['m']
-    modelout = count_modeloutput(dfgGenerator.symTable)
-    print('model output count: {:d}'.format(modelout))
-    m += modelout
-    mem_interface.gen_meminst(m)
+    # m = dfgGenerator.constTable['m']
+    # modelout = count_modeloutput(dfgGenerator.symTable)
+    xy_nodes, w_nodes = node_ir.classify_initial_nodes(dfg)
+    #print('model_input and model_output count: {:d}'.format(len(xy_nodes)))
+    #print('model output count: {:d}'.format(modelout))
+    # m += modelout
+    #mem_interface.gen_meminst(m)
+    mem_interface.gen_meminst(len(xy_nodes))
 
 
 

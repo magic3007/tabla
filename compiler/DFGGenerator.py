@@ -28,18 +28,18 @@ class DFGGenerator:
         self.dfg.add(sink)
 
         # Create hash tables for Data_Declarations
-        print("******Before DFG******")
+        # print("******Before DFG******")
         self.constTable = self.createConstTable()
         self.iterTable = self.createIterTable(self.constTable)
         self.symTable, self.gradientTable = self.createSymbolTable(self.constTable)
         self.funcTypeTable = self.createFuncTypeTable()
-        print('const table',self.constTable)
-        print('iter table',self.iterTable)
-        print('symTable',self.symTable)
-        print('funcTypeTable',self.funcTypeTable)
-        print('gradientTable', self.gradientTable)
+        # print('const table',self.constTable)
+        # print('iter table',self.iterTable)
+        # print('symTable',self.symTable)
+        # print('funcTypeTable',self.funcTypeTable)
+        # print('gradientTable', self.gradientTable)
 
-        print("================================\n\n")
+        # print("================================\n\n")
         # Get statList for all Stats
         statList = self.parseTree.getChild(1)
 
@@ -75,7 +75,7 @@ class DFGGenerator:
                 for i in range(iterList[0]):
                     if len(iterList) is 1:
                         gSym = g[0:g.find('[')] + '[' + str(i) + ']'
-                        print(gSym)
+                        #print(gSym)
                         if gSym in self.symTable:
                             mult = DFGNode()
                             mult.operation = "*"
@@ -137,10 +137,10 @@ class DFGGenerator:
         self.dfg.updateId()
         # for val in self.dfg.nodes:
             # print(val)
-        print("******After DFG******")
-        print('const table',self.constTable)
-        print('iter table',self.iterTable)
-        print('symTable',self.symTable)
+        # print("******After DFG******")
+        # print('const table',self.constTable)
+        # print('iter table',self.iterTable)
+        # print('symTable',self.symTable)
 
 #        self.dfg.save('./dfg.json')
 
@@ -436,9 +436,9 @@ class DFGGenerator:
                         modelVar = link[1]
                         self.linkTable[gradVar] = modelVar
                         gradKey = gradVar[:gradVar.find('[')] #color
-                        print(gradKey)
+                        #print(gradKey)
                         gradientTable[gradKey] = True #color
-                        print('debug', gradientTable)
+                        #print('debug', gradientTable)
                 else: # means either model_input, model_output, or model
                     # Array of vars.  ex. ['#1[#0]', '#2[#0]']
                     for d in x:

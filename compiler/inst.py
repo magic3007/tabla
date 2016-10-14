@@ -151,6 +151,7 @@ def generate_inst(node_graph, pe_per_pu):
             else: # non-source nodes
                 if len(node.children) > 1: # multiple target PEs
                     multicast(node, pe_per_pu)
+                    # continue to next iteration
                 else: # single target PE
                     srcs = []
                     for parent_node in node.parents:
@@ -274,10 +275,10 @@ def fill_null(dst_or_src, isdst):
     
 def determine_target_ns(curr_pe, target_pe, node):
     if curr_pe.id == target_pe.id:
-        return data_type_to_ns[node.outDataType]
-    elif curr_pe.next == target_pe:
+        return data_type_to_ns[node.outDataType] # same PE
+    elif curr_pe.next.id == target_pe.id:
         return "NN0" # PE Neighbor
-    elif curr_pe.pu == target_pe.pu:
+    elif curr_pe.pu.id == target_pe.pu.id:
         return "NB0" # PE bus
     elif curr_pe.pu.next_pu == target_pe.pu:
         return "NN1" # PU neighbor
@@ -291,6 +292,14 @@ def find_internal_dest(first_dests):
             if dest.namespace != "NN" and dest.namespace != "NB":
                 return dest
 
+
+def in_used_pu(pe, dests):
+    for dest in dests:
+        dest_pe = dest[0] # because it's a tuple
+        if dest_pe.pu.id == pe.pu.id:
+            return True
+    return False
+    
                 
 def multicast(node, pe_per_pu):
     '''
@@ -310,8 +319,13 @@ def multicast(node, pe_per_pu):
         used_ns = []
         for entry in pool: # FIRST, build up the first 3 dests
             target_pe = entry[0]
+            print("cycle: ", cycle, "target pe: ", target_pe.id)
+            print("in_used_pu({:d}) returns: ".format(target_pe.id), in_used_pu(target_pe, dests_by_cycle))
             ns = determine_target_ns(curr_pe, target_pe, node)
+            print("target ns: ", ns)
             if ns in used_ns:
+                continue
+            if in_used_pu(target_pe, dests_by_cycle):
                 continue
             if len(dests_by_cycle) < 3:
                 if len(dests_by_cycle) == 2:
@@ -321,7 +335,10 @@ def multicast(node, pe_per_pu):
                 else:
                     dests_by_cycle.append(entry)
                     pool.remove(entry)
-        if len(pool) > 0: # if there are more targets left, we need to save the data locally so that it can be used again
+        print("dest by cycle")
+        # for d in dests_by_cycle:
+        #     print(d[0].id)
+        if len(pool) > 0 and cycle == 0: # if there are more targets left, we need to save the data locally so that it can be used again
             out_data_type = node.outDataType
             namespace_id = data_type_to_ns[out_data_type]
             namespace = node.pe.namespace_map[namespace_id]
@@ -334,6 +351,7 @@ def multicast(node, pe_per_pu):
             dests_by_cycle.append(d)
             internal_dest = d
         fill_null(dests_by_cycle, isdst=True)
+        
 
         interpu_comm = False
         for entry in dests_by_cycle: # THEN, see if there's any pu-pu communication
@@ -354,6 +372,7 @@ def multicast(node, pe_per_pu):
                     srcs.append(src)
                 fill_null(srcs, isdst=False)
             else:
+                #print(d)
                 srcs.append(Source(namespace=d.namespace, index=d.index))
                 fill_null(srcs, isdst=False)
 
@@ -364,7 +383,7 @@ def multicast(node, pe_per_pu):
                     if type(entry) == tuple:
                         dst = entry[0] # pe
                         ns = determine_target_ns(curr_pe, dst, node)
-                        if ns == "NB1":
+                        if ns == "NB1" or ns == "NN1":
                             dst = get_dest(curr_pe, headpe, pe_per_pu)
                             dests_by_cycle[i] = dst
                             parentpe_imm = curr_pe
@@ -386,8 +405,8 @@ def multicast(node, pe_per_pu):
 
             # SECOND, send from src repr to target repr pe
             target_headpe = target.pu.head_pe
-            if headpe != curr_pe: # if data already has been sent from original pe to repr pe
-                if headpe == curr_pe.next:
+            if headpe.id != curr_pe.id: # if data already has been sent from original pe to repr pe
+                if headpe.id == curr_pe.next.id:
                     src = Source(namespace="NN", index=str(parentpe_imm.id) + "0") # id of pe where data originally came from
                 else:
                     src = Source(namespace="NB", index=str(parentpe_imm.id) + "0") # id of pe where data originally came from
@@ -422,12 +441,15 @@ def multicast(node, pe_per_pu):
                     if type(entry) == tuple:
                         dst = entry[0]
                         ns = determine_target_ns(curr_pe, dst, node)
+                        print("dest pe: {:d}, ns: ".format(dst.id), ns)
                         if ns == "NB1" or "NN1":
                             '''
                             fix: dest ID should be PU ID
                             '''
                             #dst = get_dest(curr_pe, headpe, pe_per_pu, node)
-                            if dst.pu.next_pu.id == target_headpe.pu.id:
+                            #if dst.pu.next_pu.id == target_headpe.pu.id:
+                            '''
+                            if curr_pe.pu.next_pu.id == target_headpe.pu.id:
                                 namespace = dst.namespace_map["NB0_out"]
                                 namespace.insert(namespace.tail, Ns_entry())
                                 dst = Dest("NB", str(target_headpe.pu.id) + "0")
@@ -435,7 +457,9 @@ def multicast(node, pe_per_pu):
                                 namespace = dst.namespace_map["NB1_out"]
                                 namespace.insert(namespace.tail, Ns_entry())
                                 dst = Dest("NB", str(target_headpe.pu.id) + "1")
-                                
+                            '''
+                            dst = Dest(ns[:-1], str(dst.pu.id) + ns[-1])
+                            
                             dst.dest_node_id = target_node.id if target == target_headpe else None
                             dests_by_cycle[i] = dst
                             parentpe_imm = headpe
@@ -448,7 +472,10 @@ def multicast(node, pe_per_pu):
                             dst = get_dest(curr_pe, dst, pe_per_pu, node)
                             dst.dest_node_id = target_node.id if target == target_headpe else None
                             dests_by_cycle[i] = dst
-                inst = Inst(node.op, dests_by_cycle, srcs)
+                if cycle > 0:
+                    inst = Inst("pass", dests_by_cycle, srcs)
+                else:
+                    inst = Inst(node.op, dests_by_cycle, srcs)
                 headpe.add_inst(inst)
                 node.inst.append(inst)
 
