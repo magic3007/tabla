@@ -10,9 +10,7 @@ iterator i[0:m];
 
 h = sum[i](w[i] * x[i]);
 c = y * h;
-//co = (c > 1) * (1 - c)
 ny = 0 - y;
-//g[i] = ((c > 1) * ny) * x[i];
 p = ((c > 1) * ny);
 g[i] = p * x[i];
 
