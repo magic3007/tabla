@@ -72,8 +72,8 @@ class DotGenerator:
             color = 'hotpink'
         elif node.dataType == 'model':
             color = 'yellow'
-        elif node.dataType == 'gradient':
-            color = 'green'
+        # elif node.dataType == 'gradient':
+        #     color = 'green'
         elif node.dataType == 'constant':
             color = 'gray'
         else:
