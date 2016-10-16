@@ -1,4 +1,4 @@
-mu = 1;
+mu = 1; // learning rate
 m = 3; // num of features
 
 model_input x[m]; // Assume x[0] is 1
