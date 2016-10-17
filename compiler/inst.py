@@ -61,9 +61,7 @@ class Inst:
     def toDict(self):
         d = {}
         d["op"] = self.op
-        #print("DEBUG ", self.dests)
         d["dests"] = [dest.toDict() for dest in self.dests] if self.dests is not None else None
-        #print("DEBUG ", self.srcs)
         #d["srcs"] = [src.toDict() for src in self.srcs] if self.srcs is not None else None
         if self.srcs is not None:
             s = []
@@ -91,7 +89,6 @@ class Inst:
                 dests.append(dest)
             self.dests = dests
             srcs = []
-            #print(d)
             if d["srcs"] is not None:
                 for src_d in d["srcs"]:
                     src = Source()
@@ -263,6 +260,139 @@ def generate_inst(node_graph, pe_per_pu):
         cycl += 1
         nodes = node_graph.get_nodes_in_cycle(cycl)
 
+
+def multicast(curr_pe, dest_pes, src_pes):
+    grouped = group_pes_to_pus(dest_pes) # PU to PE mapping
+
+    need_interpu = False
+    if len(grouped) > 1 or len(grouped) == 1 and curr_pe.pu not in grouped:
+        need_interpu = True
+
+    # first, send data to the PE's in this PU
+    if curr_pe.pu in grouped:
+        within_pu(curr_pe, grouped[curr_pe.pu], src_pes, need_interpu)
+    elif need_interpu and not curr_pe.isrepr:
+        within_pu(curr_pe, None, src_pes, need_interpu)
+
+    repr_pe = curr_pe.pu.head_pe
+    target_repr_pus = list(grouped.keys())
+    target_repr_pes = [pu.head_pe for pu in target_repr_pus]
+
+    # send from repr PE to other repr PE's in other PU's
+    inter_pu(repr_pe, target_repr_pes)
+
+    # at each repr PE, send to target PE's in its own PU
+    for pu in grouped:
+        if curr_pe.pu.id == pu.id:
+            continue
+        within_pu(pu.head_pe, grouped[pu], repr_pe, need_interpu=False)
+
+
+def within_pu(curr_pe, dest_pes, src_pes, need_interpu):
+    '''
+    Handles multicasting within a single PU
+    '''
+    cycle = 0
+    dests = [] # PEs
+
+    while len(dest_pes) > 0:
+        if need_interpu and not curr_pe.isrepr:
+            dests.append(curr_pe.pu.head_pe)
+        select_dests(dest_pes, curr_pe, dests)
+        dest_insts = gen_dest_inst(dests, curr_pe)
+        if cycle == 0:
+            op = node.op
+        else:
+            op = 'pass'
+        inst = Inst(op, dest_insts, )
+        curr_pe.add_inst(inst)
+    return
+
+
+def gen_src_insts(srcs, curr_pe, cycle):
+    src_insts = []
+    if cycle == 0:
+        for src in srcs:
+            src_insts.append()
+    else:
+        pass
+
+
+def gen_dest_insts(dests, curr_pe):
+    dest_insts = []
+    
+    for dest in dests:
+        dest_insts.append(get_dest(curr_pe, dest, 8))
+    fill_null(dest_insts, isdst=True)
+    return dest_insts
+
+
+def inter_pu(repr_pe, dest_pes):
+    '''
+    Handles multicasting among different PU's through repr PE's
+    '''
+    dests = [] # PU's
+    
+    while len(dest_pes) > 0:
+        select_dests(dest_pes, repr_pe, dests)
+        dest_insts = gen_dets_inst(dests, repr_pe)
+        if cycle == 0:
+            op = node.op
+        else:
+            op = 'pass'
+        inst = Inst(op, dest_insts, )
+        repr_pe.add_inst(inst)
+    return
+
+
+def select_dests(dest_pes, src_pe, dests, localns):
+    ns_used = []
+
+    for i, dest_pe in enumerate(dest_pes):
+        ns = get_ns(src_pe, dest_pe)
+        if ns not in ns_used:
+            ns_used.append(ns)
+            dests.append(dest_pe)
+            dest_pes.pop(i)
+        if len(dests) == 2:
+            if len(dest_pes) == 1 and get_ns(src_pe, dest_pe) not in ns_used:
+                dests.append(dest_pe)
+                dest_pes.pop(i)
+            else:
+                local = src_pe.namespace_map[localns]
+                dests.append()
+        if len(dests) == 3:
+            break
+
+
+def get_ns(src_pe, dest_pe):
+    '''
+    assuming two pe's are different
+    '''
+    if src_pe.next.id == dest_pe.id:
+        return 'NN0'
+    elif src_pe.pu.id == dest_pe.pu.id:
+        return 'NB0'
+    elif src_pe.pu.next.id == dest_pe.pu.id:
+        return 'NN1'
+    else:
+        return 'NB1'
+    
+
+def group_pes_to_pus(pes):
+    '''
+    Given a list of PE's, group them by their respective PUs.
+    Returns a dict of pu to pe id list.
+    '''
+    pus = {}
+    for pe in pes:
+        pu = pe.pu
+        if pu not in pus:
+            pus[pu] = [pe]
+        else:
+            pus[pu].append(pe)
+    return pus
+
         
 def fill_null(dst_or_src, isdst):
     if isdst:
@@ -301,239 +431,239 @@ def in_used_pu(pe, dests):
     return False
     
                 
-def multicast(node, pe_per_pu):
-    '''
-    This function generates instructions for nodes with multiple chidlren.
-    The issue is that currently the hardware doesn't allow two of the same
-    namespace data to be sent over the bus. In this case, there needs to be 
-    multiple cycles of instructions generated. For instance, if PE0 is sending
-    data to PE4 and PE5 (both via PE bus), it chooses PE4 first, followed by 
-    PE5 in the next cycle.
-    '''
-    cycle = 0
-    curr_pe = node.pe
-    pool = [(child_node.pe, child_node) for child_node in node.children]
-    dests_by_cycle = []
-    internal_dest = None
-    while len(pool) > 0:
-        used_ns = []
-        for entry in pool: # FIRST, build up the first 3 dests
-            target_pe = entry[0]
-            print("cycle: ", cycle, "target pe: ", target_pe.id)
-            print("in_used_pu({:d}) returns: ".format(target_pe.id), in_used_pu(target_pe, dests_by_cycle))
-            ns = determine_target_ns(curr_pe, target_pe, node)
-            print("target ns: ", ns)
-            if ns in used_ns:
-                continue
-            if in_used_pu(target_pe, dests_by_cycle):
-                continue
-            if len(dests_by_cycle) < 3:
-                if len(dests_by_cycle) == 2:
-                    if len(pool) == 1: # if there's only one target left, just put it here
-                        dests_by_cycle.append(entry)
-                        pool.remove(entry)
-                else:
-                    dests_by_cycle.append(entry)
-                    pool.remove(entry)
-        print("dest by cycle")
-        # for d in dests_by_cycle:
-        #     print(d[0].id)
-        if len(pool) > 0 and cycle == 0: # if there are more targets left, we need to save the data locally so that it can be used again
-            out_data_type = node.outDataType
-            namespace_id = data_type_to_ns[out_data_type]
-            namespace = node.pe.namespace_map[namespace_id]
-            if namespace.tail >= 0:
-                index = namespace.tail
-            else:
-                raise Exception("namespace full")
-            namespace.insert(namespace.tail, Ns_entry()) # dummy insertion to keep track of the free index in the namespace
-            d = Dest(namespace_id, str(index), node.id)
-            dests_by_cycle.append(d)
-            internal_dest = d
-        fill_null(dests_by_cycle, isdst=True)
+# def multicast(node, pe_per_pu):
+#     '''
+#     This function generates instructions for nodes with multiple chidlren.
+#     The issue is that currently the hardware doesn't allow two of the same
+#     namespace data to be sent over the bus. In this case, there needs to be 
+#     multiple cycles of instructions generated. For instance, if PE0 is sending
+#     data to PE4 and PE5 (both via PE bus), it chooses PE4 first, followed by 
+#     PE5 in the next cycle.
+#     '''
+#     cycle = 0
+#     curr_pe = node.pe
+#     pool = [(child_node.pe, child_node) for child_node in node.children]
+#     dests_by_cycle = []
+#     internal_dest = None
+#     while len(pool) > 0:
+#         used_ns = []
+#         for entry in pool: # FIRST, build up the first 3 dests
+#             target_pe = entry[0]
+#             print("cycle: ", cycle, "target pe: ", target_pe.id)
+#             print("in_used_pu({:d}) returns: ".format(target_pe.id), in_used_pu(target_pe, dests_by_cycle))
+#             ns = determine_target_ns(curr_pe, target_pe, node)
+#             print("target ns: ", ns)
+#             if ns in used_ns:
+#                 continue
+#             if in_used_pu(target_pe, dests_by_cycle):
+#                 continue
+#             if len(dests_by_cycle) < 3:
+#                 if len(dests_by_cycle) == 2:
+#                     if len(pool) == 1: # if there's only one target left, just put it here
+#                         dests_by_cycle.append(entry)
+#                         pool.remove(entry)
+#                 else:
+#                     dests_by_cycle.append(entry)
+#                     pool.remove(entry)
+#         print("dest by cycle")
+#         # for d in dests_by_cycle:
+#         #     print(d[0].id)
+#         if len(pool) > 0 and cycle == 0: # if there are more targets left, we need to save the data locally so that it can be used again
+#             out_data_type = node.outDataType
+#             namespace_id = data_type_to_ns[out_data_type]
+#             namespace = node.pe.namespace_map[namespace_id]
+#             if namespace.tail >= 0:
+#                 index = namespace.tail
+#             else:
+#                 raise Exception("namespace full")
+#             namespace.insert(namespace.tail, Ns_entry()) # dummy insertion to keep track of the free index in the namespace
+#             d = Dest(namespace_id, str(index), node.id)
+#             dests_by_cycle.append(d)
+#             internal_dest = d
+#         fill_null(dests_by_cycle, isdst=True)
         
 
-        interpu_comm = False
-        for entry in dests_by_cycle: # THEN, see if there's any pu-pu communication
-            if type(entry) == tuple:
-                target_pe = entry[0]
-                target_node = entry[1]
-                ns = determine_target_ns(curr_pe, target_pe, node)
-                if ns == "NB1": # there is a pu-pu communication
-                    interpu_comm = True
-                    target = target_pe
-                    break
+#         interpu_comm = False
+#         for entry in dests_by_cycle: # THEN, see if there's any pu-pu communication
+#             if type(entry) == tuple:
+#                 target_pe = entry[0]
+#                 target_node = entry[1]
+#                 ns = determine_target_ns(curr_pe, target_pe, node)
+#                 if ns == "NB1": # there is a pu-pu communication
+#                     interpu_comm = True
+#                     target = target_pe
+#                     break
 
-        if interpu_comm:
-            srcs = []
-            if cycle == 0:
-                for parent_node in node.parents:
-                    src = get_src(node, parent_node, pe_per_pu)
-                    srcs.append(src)
-                fill_null(srcs, isdst=False)
-            else:
-                #print(d)
-                srcs.append(Source(namespace=d.namespace, index=d.index))
-                fill_null(srcs, isdst=False)
+#         if interpu_comm:
+#             srcs = []
+#             if cycle == 0:
+#                 for parent_node in node.parents:
+#                     src = get_src(node, parent_node, pe_per_pu)
+#                     srcs.append(src)
+#                 fill_null(srcs, isdst=False)
+#             else:
+#                 #print(d)
+#                 srcs.append(Source(namespace=d.namespace, index=d.index))
+#                 fill_null(srcs, isdst=False)
 
-            headpe = curr_pe.pu.head_pe
-            # FIRST, send to representative pe
-            if curr_pe.id != headpe.id:
-                for i, entry in enumerate(dests_by_cycle):
-                    if type(entry) == tuple:
-                        dst = entry[0] # pe
-                        ns = determine_target_ns(curr_pe, dst, node)
-                        if ns == "NB1" or ns == "NN1":
-                            dst = get_dest(curr_pe, headpe, pe_per_pu)
-                            dests_by_cycle[i] = dst
-                            parentpe_imm = curr_pe
-                        elif ns == "NB0" or ns == "NN0":
-                            dst = get_dest(curr_pe, dst, pe_per_pu)
-                            dst.dest_node_id = entry[1].id
-                            dests_by_cycle[i] = dst
-                            parentpe_imm = curr_pe
-                        else:
-                            dst = get_dest(curr_pe, dst, pe_per_pu, node)
-                            dst.dest_node_id = entry[1].id
-                            dests_by_cycle[i] = dst
-                if cycle == 0:
-                    inst = Inst(node.op, dests_by_cycle, srcs)
-                else:
-                    inst = Inst("pass", dests_by_cycle, srcs)
-                node.pe.add_inst(inst)
-                node.inst.append(inst)
+#             headpe = curr_pe.pu.head_pe
+#             # FIRST, send to representative pe
+#             if curr_pe.id != headpe.id:
+#                 for i, entry in enumerate(dests_by_cycle):
+#                     if type(entry) == tuple:
+#                         dst = entry[0] # pe
+#                         ns = determine_target_ns(curr_pe, dst, node)
+#                         if ns == "NB1" or ns == "NN1":
+#                             dst = get_dest(curr_pe, headpe, pe_per_pu)
+#                             dests_by_cycle[i] = dst
+#                             parentpe_imm = curr_pe
+#                         elif ns == "NB0" or ns == "NN0":
+#                             dst = get_dest(curr_pe, dst, pe_per_pu)
+#                             dst.dest_node_id = entry[1].id
+#                             dests_by_cycle[i] = dst
+#                             parentpe_imm = curr_pe
+#                         else:
+#                             dst = get_dest(curr_pe, dst, pe_per_pu, node)
+#                             dst.dest_node_id = entry[1].id
+#                             dests_by_cycle[i] = dst
+#                 if cycle == 0:
+#                     inst = Inst(node.op, dests_by_cycle, srcs)
+#                 else:
+#                     inst = Inst("pass", dests_by_cycle, srcs)
+#                 node.pe.add_inst(inst)
+#                 node.inst.append(inst)
 
-            # SECOND, send from src repr to target repr pe
-            target_headpe = target.pu.head_pe
-            if headpe.id != curr_pe.id: # if data already has been sent from original pe to repr pe
-                if headpe.id == curr_pe.next.id:
-                    src = Source(namespace="NN", index=str(parentpe_imm.id) + "0") # id of pe where data originally came from
-                else:
-                    src = Source(namespace="NB", index=str(parentpe_imm.id) + "0") # id of pe where data originally came from
-                srcs = []
-                srcs.append(src)
-                fill_null(srcs, isdst=False)
+#             # SECOND, send from src repr to target repr pe
+#             target_headpe = target.pu.head_pe
+#             if headpe.id != curr_pe.id: # if data already has been sent from original pe to repr pe
+#                 if headpe.id == curr_pe.next.id:
+#                     src = Source(namespace="NN", index=str(parentpe_imm.id) + "0") # id of pe where data originally came from
+#                 else:
+#                     src = Source(namespace="NB", index=str(parentpe_imm.id) + "0") # id of pe where data originally came from
+#                 srcs = []
+#                 srcs.append(src)
+#                 fill_null(srcs, isdst=False)
 
-                '''
-                fix: dest id should be PU ID
-                '''
-                #dst = get_dest(headpe, target_headpe, pe_per_pu) # first need to send to repr target pe
-                if headpe.pu.next_pu.id == target_headpe.pu.id:
-                    namespace = headpe.namespace_map["NB0_out"]
-                    namespace.insert(namespace.tail, Ns_entry())
-                    dst = Dest("NN", str(target_headpe.pu.id) + "1")
-                else:
-                    namespace = headpe.namespace_map["NB1_out"]
-                    namespace.insert(namespace.tail, Ns_entry())
-                    dst = Dest("NB", str(target_headpe.pu.id) + "1")
-                dst.dest_node_id = target_node.id if target == target_headpe else None
-                dsts = []
-                dsts.append(dst)
-                fill_null(dsts, isdst=True)
+#                 '''
+#                 fix: dest id should be PU ID
+#                 '''
+#                 #dst = get_dest(headpe, target_headpe, pe_per_pu) # first need to send to repr target pe
+#                 if headpe.pu.next_pu.id == target_headpe.pu.id:
+#                     namespace = headpe.namespace_map["NB0_out"]
+#                     namespace.insert(namespace.tail, Ns_entry())
+#                     dst = Dest("NN", str(target_headpe.pu.id) + "1")
+#                 else:
+#                     namespace = headpe.namespace_map["NB1_out"]
+#                     namespace.insert(namespace.tail, Ns_entry())
+#                     dst = Dest("NB", str(target_headpe.pu.id) + "1")
+#                 dst.dest_node_id = target_node.id if target == target_headpe else None
+#                 dsts = []
+#                 dsts.append(dst)
+#                 fill_null(dsts, isdst=True)
 
-                inst = Inst("pass", dsts, srcs)
-                headpe.add_inst(inst)
-                node.inst.append(inst)
-                parentpe_imm = headpe
-                parentpu = parentpe_imm.pu
-            else:
-                for i, entry in enumerate(dests_by_cycle):
-                    if type(entry) == tuple:
-                        dst = entry[0]
-                        ns = determine_target_ns(curr_pe, dst, node)
-                        print("dest pe: {:d}, ns: ".format(dst.id), ns)
-                        if ns == "NB1" or "NN1":
-                            '''
-                            fix: dest ID should be PU ID
-                            '''
-                            #dst = get_dest(curr_pe, headpe, pe_per_pu, node)
-                            #if dst.pu.next_pu.id == target_headpe.pu.id:
-                            '''
-                            if curr_pe.pu.next_pu.id == target_headpe.pu.id:
-                                namespace = dst.namespace_map["NB0_out"]
-                                namespace.insert(namespace.tail, Ns_entry())
-                                dst = Dest("NB", str(target_headpe.pu.id) + "0")
-                            else:
-                                namespace = dst.namespace_map["NB1_out"]
-                                namespace.insert(namespace.tail, Ns_entry())
-                                dst = Dest("NB", str(target_headpe.pu.id) + "1")
-                            '''
-                            dst = Dest(ns[:-1], str(dst.pu.id) + ns[-1])
+#                 inst = Inst("pass", dsts, srcs)
+#                 headpe.add_inst(inst)
+#                 node.inst.append(inst)
+#                 parentpe_imm = headpe
+#                 parentpu = parentpe_imm.pu
+#             else:
+#                 for i, entry in enumerate(dests_by_cycle):
+#                     if type(entry) == tuple:
+#                         dst = entry[0]
+#                         ns = determine_target_ns(curr_pe, dst, node)
+#                         print("dest pe: {:d}, ns: ".format(dst.id), ns)
+#                         if ns == "NB1" or "NN1":
+#                             '''
+#                             fix: dest ID should be PU ID
+#                             '''
+#                             #dst = get_dest(curr_pe, headpe, pe_per_pu, node)
+#                             #if dst.pu.next_pu.id == target_headpe.pu.id:
+#                             '''
+#                             if curr_pe.pu.next_pu.id == target_headpe.pu.id:
+#                                 namespace = dst.namespace_map["NB0_out"]
+#                                 namespace.insert(namespace.tail, Ns_entry())
+#                                 dst = Dest("NB", str(target_headpe.pu.id) + "0")
+#                             else:
+#                                 namespace = dst.namespace_map["NB1_out"]
+#                                 namespace.insert(namespace.tail, Ns_entry())
+#                                 dst = Dest("NB", str(target_headpe.pu.id) + "1")
+#                             '''
+#                             dst = Dest(ns[:-1], str(dst.pu.id) + ns[-1])
                             
-                            dst.dest_node_id = target_node.id if target == target_headpe else None
-                            dests_by_cycle[i] = dst
-                            parentpe_imm = headpe
-                            parentpu = parentpe_imm.pu
-                        elif ns == "NB0" or ns == "NN0":
-                            dst = get_dest(curr_pe, dst, pe_per_pu, node)
-                            dst.dest_node_id = target_node.id if target == target_headpe else None
-                            dests_by_cycle[i] = dst
-                        else:
-                            dst = get_dest(curr_pe, dst, pe_per_pu, node)
-                            dst.dest_node_id = target_node.id if target == target_headpe else None
-                            dests_by_cycle[i] = dst
-                if cycle > 0:
-                    inst = Inst("pass", dests_by_cycle, srcs)
-                else:
-                    inst = Inst(node.op, dests_by_cycle, srcs)
-                headpe.add_inst(inst)
-                node.inst.append(inst)
+#                             dst.dest_node_id = target_node.id if target == target_headpe else None
+#                             dests_by_cycle[i] = dst
+#                             parentpe_imm = headpe
+#                             parentpu = parentpe_imm.pu
+#                         elif ns == "NB0" or ns == "NN0":
+#                             dst = get_dest(curr_pe, dst, pe_per_pu, node)
+#                             dst.dest_node_id = target_node.id if target == target_headpe else None
+#                             dests_by_cycle[i] = dst
+#                         else:
+#                             dst = get_dest(curr_pe, dst, pe_per_pu, node)
+#                             dst.dest_node_id = target_node.id if target == target_headpe else None
+#                             dests_by_cycle[i] = dst
+#                 if cycle > 0:
+#                     inst = Inst("pass", dests_by_cycle, srcs)
+#                 else:
+#                     inst = Inst(node.op, dests_by_cycle, srcs)
+#                 headpe.add_inst(inst)
+#                 node.inst.append(inst)
 
-            # THIRD
-            if target != target_headpe:
-                dst = get_dest(target_headpe, target, pe_per_pu)
-                dst.dest_node_id = target_node.id
-                dsts = []
-                dsts.append(dst)
-                fill_null(dsts, isdst=True)
+#             # THIRD
+#             if target != target_headpe:
+#                 dst = get_dest(target_headpe, target, pe_per_pu)
+#                 dst.dest_node_id = target_node.id
+#                 dsts = []
+#                 dsts.append(dst)
+#                 fill_null(dsts, isdst=True)
 
-                if parentpu.next_pu.id == target_headpe.pu.id:
-                    src = Source(namespace="NB", index=str(parentpu.id) + "0")
-                else:
-                    src = Source(namespace="NB", index=str(parentpu.id) + "1") # id of pe where data originally came from
-                srcs = []
-                srcs.append(src)
-                fill_null(srcs, isdst=False)
+#                 if parentpu.next_pu.id == target_headpe.pu.id:
+#                     src = Source(namespace="NB", index=str(parentpu.id) + "0")
+#                 else:
+#                     src = Source(namespace="NB", index=str(parentpu.id) + "1") # id of pe where data originally came from
+#                 srcs = []
+#                 srcs.append(src)
+#                 fill_null(srcs, isdst=False)
 
-                inst = Inst("pass", dsts, srcs)
-                target_headpe.add_inst(inst)
-                node.inst.append(inst)
-            cycle += 1
-            dests_by_cycle = []
-            continue # back to while loop
+#                 inst = Inst("pass", dsts, srcs)
+#                 target_headpe.add_inst(inst)
+#                 node.inst.append(inst)
+#             cycle += 1
+#             dests_by_cycle = []
+#             continue # back to while loop
 
-        else: # no pu-pu communication - need to be fixed?
-            srcs = []
-            dests = []
-            if cycle > 0:
-                op = "pass"
-                latest_inst = curr_pe.get_inst()
-                internal_dest = find_internal_dest(latest_inst.dests)
-                src_for_pass = Source(internal_dest.namespace, internal_dest.index)
-                srcs = []
-                srcs.append(src_for_pass)
-                fill_null(srcs, isdst=False)
-            else:
-                op = node.op
-                for parent_node in node.parents:
-                    src = get_src(node, parent_node, pe_per_pu)
-                    srcs.append(src)
-                fill_null(srcs, isdst=False)
-            for entry in dests_by_cycle:
-                if isinstance(entry, Dest):
-                    dst = entry
-                else:
-                    dst_pe = entry[0]
-                    dst = get_dest(curr_pe, dst_pe, pe_per_pu, node)
-                    dst.dest_node_id = entry[1].id
-                dests.append(dst)
-            inst = Inst(op, dests, srcs)
-            curr_pe.add_inst(inst)
-            node.inst.append(inst)
+#         else: # no pu-pu communication - need to be fixed?
+#             srcs = []
+#             dests = []
+#             if cycle > 0:
+#                 op = "pass"
+#                 latest_inst = curr_pe.get_inst()
+#                 internal_dest = find_internal_dest(latest_inst.dests)
+#                 src_for_pass = Source(internal_dest.namespace, internal_dest.index)
+#                 srcs = []
+#                 srcs.append(src_for_pass)
+#                 fill_null(srcs, isdst=False)
+#             else:
+#                 op = node.op
+#                 for parent_node in node.parents:
+#                     src = get_src(node, parent_node, pe_per_pu)
+#                     srcs.append(src)
+#                 fill_null(srcs, isdst=False)
+#             for entry in dests_by_cycle:
+#                 if isinstance(entry, Dest):
+#                     dst = entry
+#                 else:
+#                     dst_pe = entry[0]
+#                     dst = get_dest(curr_pe, dst_pe, pe_per_pu, node)
+#                     dst.dest_node_id = entry[1].id
+#                 dests.append(dst)
+#             inst = Inst(op, dests, srcs)
+#             curr_pe.add_inst(inst)
+#             node.inst.append(inst)
 
-            cycle += 1
-            dests_by_cycle = []
-    return
+#             cycle += 1
+#             dests_by_cycle = []
+#     return
 
 
 def in_use(entry, dests):

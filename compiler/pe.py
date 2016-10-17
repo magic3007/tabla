@@ -46,6 +46,12 @@ class Pe:
     def initialize_namespace(self, init_data):
         pass
 
+    def isrepr(self):
+        '''
+        Returns True if this PE is the representative PE in its PU
+        '''
+        return self.id == self.pu.head_pe.id
+
     def add_inst(self, new_inst):
         self.inst.append(new_inst)
 
