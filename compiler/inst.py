@@ -150,7 +150,11 @@ def generate_inst(node_graph, pe_per_pu):
                     #multicast(node, pe_per_pu)
                     dest_pes = [c.pe for c in node.children]
                     src_pes = [p.pe for p in node.parents]
-                    multicast(node.pe, dest_pes, src_pes, node.op)
+                    source = None
+                    for p in node.parents:
+                        if p.pe.id == node.pe.id:
+                            source = get_src(node, p, 8)
+                    multicast(node.pe, dest_pes, src_pes, node.op, source)
                     # continue to next iteration
                 else: # single target PE
                     srcs = []
@@ -264,7 +268,7 @@ def generate_inst(node_graph, pe_per_pu):
         nodes = node_graph.get_nodes_in_cycle(cycl)
 
 
-def multicast(curr_pe, dest_pes, src_pes, op):
+def multicast(curr_pe, dest_pes, src_pes, op, source):
     grouped = group_pes_to_pus(dest_pes) # PU to PE mapping
 
     need_interpu = False
@@ -273,18 +277,18 @@ def multicast(curr_pe, dest_pes, src_pes, op):
 
     # first, send data to the PE's in this PU
     if curr_pe.pu in grouped:
-        repr_src = within_pu(curr_pe, grouped[curr_pe.pu], src_pes, need_interpu, op)
+        repr_src = within_pu(curr_pe, grouped[curr_pe.pu], src_pes, need_interpu, op, source)
         op = 'pass'
     elif need_interpu and not curr_pe.isrepr:
         op = 'pass'
         pass # TODO
 
-    repr_pe = curr_pe.pu.head_pe
-    target_repr_pus = list(grouped.keys()) # keys() are PU id's
-    target_repr_pes = [pu.head_pe for pu in target_repr_pus]
-
     # send from repr PE to other repr PE's in other PU's
     if need_interpu:
+        repr_pe = curr_pe.pu.head_pe
+        target_repr_pus = list(grouped.keys()) # keys() are PU id's
+        target_repr_pes = [pu.head_pe for pu in target_repr_pus]
+
         inter_pu(repr_pe, target_repr_pes, repr_src, op)
 
         # at each repr PE, send to target PE's in its own PU
@@ -294,7 +298,7 @@ def multicast(curr_pe, dest_pes, src_pes, op):
             within_pu(pu.head_pe, grouped[pu], repr_pe, False, op)
 
 
-def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op):
+def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None):
     '''
     Handles multicasting within a single PU.
     Returns namespace and index of source for repr PE.
@@ -303,6 +307,7 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op):
     dests = [] # PEs
 
     # send to repr PE, if necessary
+    repr_src = None
     if need_interpu and not curr_pe.isrepr:
         dests.append(curr_pe.pu.head_pe)
         if curr_pe.pu.head_pe in dest_pes: # if repr PE already in target PE
@@ -319,8 +324,10 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op):
         # fill dests
         select_dests(dest_pes, curr_pe, dests, 'NI', cycle)
         dest_insts = gen_dest_insts(dests, curr_pe)
-        interim = get_interim(dest_insts)
-        src_insts = gen_src_insts(src_pes, curr_pe, interim, cycle)
+        if cycle == 0:
+            interim = get_interim(dest_insts)
+        src_insts = gen_src_insts(src_pes, curr_pe, interim, source, cycle)
+        
         if cycle == 0:
             opcode = op
         else:
@@ -340,7 +347,7 @@ def inter_pu(repr_pe, dest_pes, src_pes, op):
     '''
     dests = [] # PU's
     cycle = 0
-    
+
     while len(dest_pes) > 0:
         select_dests(dest_pes, repr_pe, dests, 'NI', cycle)
         dest_insts = gen_dets_inst(dests, repr_pe)
@@ -406,18 +413,17 @@ def get_interim(dest_insts):
             return dest
 
 
-def gen_src_insts(src_pes, curr_pe, interim, cycle):
+def gen_src_insts(src_pes, curr_pe, interim, source, cycle):
     src_insts = []
     if cycle == 0:
         for src_pe in src_pes:
             if src_pe.id == curr_pe.id: # TODO
-                
-                ns = curr_pe.namespace_map[interim]
-                index = str(ns.tail - 1)
+                src_insts.append(source)
             else:
                 ns = get_ns(src_pe, curr_pe)
-                index = str(src_pe.id)
-            src_insts.append(Source(ns, index))
+                index = str(src_pe.id) + str(ns[-1])
+                print(ns[:-1], index)
+                src_insts.append(Source(ns[:-1], index))
     else:
         src_insts.append(Source(interim.namespace, interim.index))
 
