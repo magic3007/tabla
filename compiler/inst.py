@@ -150,7 +150,7 @@ def generate_inst(node_graph, pe_per_pu):
                     #multicast(node, pe_per_pu)
                     dest_pes = [c.pe for c in node.children]
                     src_pes = [p.pe for p in node.parents]
-                    multicast(node.pe, dest_pes, src_pes)
+                    multicast(node.pe, dest_pes, src_pes, node.op)
                     # continue to next iteration
                 else: # single target PE
                     srcs = []
@@ -264,7 +264,7 @@ def generate_inst(node_graph, pe_per_pu):
         nodes = node_graph.get_nodes_in_cycle(cycl)
 
 
-def multicast(curr_pe, dest_pes, src_pes):
+def multicast(curr_pe, dest_pes, src_pes, op):
     grouped = group_pes_to_pus(dest_pes) # PU to PE mapping
 
     need_interpu = False
@@ -273,77 +273,68 @@ def multicast(curr_pe, dest_pes, src_pes):
 
     # first, send data to the PE's in this PU
     if curr_pe.pu in grouped:
-        within_pu(curr_pe, grouped[curr_pe.pu], src_pes, need_interpu)
+        repr_src = within_pu(curr_pe, grouped[curr_pe.pu], src_pes, need_interpu, op)
+        op = 'pass'
     elif need_interpu and not curr_pe.isrepr:
-        within_pu(curr_pe, [curr_pe.pu.head_pe], src_pes, need_interpu)
+        op = 'pass'
+        pass # TODO
 
     repr_pe = curr_pe.pu.head_pe
-    target_repr_pus = list(grouped.keys())
+    target_repr_pus = list(grouped.keys()) # keys() are PU id's
     target_repr_pes = [pu.head_pe for pu in target_repr_pus]
 
     # send from repr PE to other repr PE's in other PU's
-    inter_pu(repr_pe, target_repr_pes)
+    if need_interpu:
+        inter_pu(repr_pe, target_repr_pes, repr_src, op)
 
-    # at each repr PE, send to target PE's in its own PU
-    for pu in grouped:
-        if curr_pe.pu.id == pu.id:
-            continue
-        within_pu(pu.head_pe, grouped[pu], repr_pe, need_interpu=False)
+        # at each repr PE, send to target PE's in its own PU
+        for pu in grouped:
+            if curr_pe.pu.id == pu.id:
+                continue
+            within_pu(pu.head_pe, grouped[pu], repr_pe, False, op)
 
 
-def within_pu(curr_pe, dest_pes, src_pes, need_interpu):
+def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op):
     '''
-    Handles multicasting within a single PU
+    Handles multicasting within a single PU.
+    Returns namespace and index of source for repr PE.
     '''
     cycle = 0
     dests = [] # PEs
 
+    # send to repr PE, if necessary
     if need_interpu and not curr_pe.isrepr:
         dests.append(curr_pe.pu.head_pe)
+        if curr_pe.pu.head_pe in dest_pes: # if repr PE already in target PE
+            dest_pes.remove(curr_pe.pu.head_pe)
+        d = gen_dest_insts(dests, curr_pe)
+        repr_src = d[0]
+
+    # send to interim namesapce, if necessary
+    if curr_pe in dest_pes:
+        dests.append(curr_pe)
+        dest_pes.remove(curr_pe)
 
     while len(dest_pes) > 0:
-        select_dests(dest_pes, curr_pe, dests, 'NI')
-        dest_insts = gen_dest_inst(dests, curr_pe)
-        src_insts = gen_src_insts(src_pes, curr_pe, 'NI', cycle)
+        # fill dests
+        select_dests(dest_pes, curr_pe, dests, 'NI', cycle)
+        dest_insts = gen_dest_insts(dests, curr_pe)
+        interim = get_interim(dest_insts)
+        src_insts = gen_src_insts(src_pes, curr_pe, interim, cycle)
         if cycle == 0:
-            op = node.op
+            opcode = op
         else:
-            op = 'pass'
-        inst = Inst(op, dest_insts, src_insts)
+            opcode = 'pass'
+        inst = Inst(opcode, dest_insts, src_insts)
         curr_pe.add_inst(inst)
 
         cycle += 1
         dests = []
-    return
+
+    return repr_src
 
 
-def gen_src_insts(src_pes, curr_pe, localns, cycle):
-    src_insts = []
-    if cycle == 0:
-        for src_pe in src_pes:
-            if src_pe.id == curr_pe.id:
-                pass
-            else:
-                ns = get_ns(src_pe, curr_pe)
-                index = str(src_pe.id)
-            src_insts.append(Source(ns, index))
-    else:
-        ns = curr_pe.namespace_map[localns]
-        src_insts.append(Source(localns, str(ns.tail - 1)))
-        
-    fill_null(src_insts, isdst=False)
-    return src_insts
-
-
-def gen_dest_insts(dests, curr_pe):
-    dest_insts = []
-    for dest in dests:
-        dest_insts.append(get_dest(curr_pe, dest, 8))
-    fill_null(dest_insts, isdst=True)
-    return dest_insts
-
-
-def inter_pu(repr_pe, dest_pes):
+def inter_pu(repr_pe, dest_pes, src_pes, op):
     '''
     Handles multicasting among different PU's through repr PE's
     '''
@@ -351,19 +342,32 @@ def inter_pu(repr_pe, dest_pes):
     cycle = 0
     
     while len(dest_pes) > 0:
-        select_dests(dest_pes, repr_pe, dests)
+        select_dests(dest_pes, repr_pe, dests, 'NI', cycle)
         dest_insts = gen_dets_inst(dests, repr_pe)
-        if cycle == 0:
-            op = node.op
+        interim = get_interim(dest_insts)
+        if type(src_pes) == Dest:
+            src_insts = []
+            ns = src_pes.namespace
+            index = src_pes.index
+            src_insts.append(Source(ns, index))
+            fill_null(src_insts, isdst=False)
         else:
-            op = 'pass'
-        inst = Inst(op, dest_insts, src_insts)
+            src_insts = gen_src_insts(src_pes, repr_pe, interim, cycle)
+        if op != 'pass' and cycle == 0:
+            opcode = op
+        else:
+            opcode = 'pass'
+        inst = Inst(opcode, dest_insts, src_insts)
         repr_pe.add_inst(inst)
         cycle += 1
     return
 
 
-def select_dests(dest_pes, src_pe, dests, localns):
+def select_dests(dest_pes, src_pe, dests, localns, cycle):
+    '''
+    From the given target PE's, select up to 3 and fill up
+    dests array.
+    '''
     ns_used = []
 
     for i, dest_pe in enumerate(dest_pes):
@@ -376,11 +380,49 @@ def select_dests(dest_pes, src_pe, dests, localns):
             if len(dest_pes) == 1 and get_ns(src_pe, dest_pe) not in ns_used:
                 dests.append(dest_pe)
                 dest_pes.pop(i)
-            else:
+            elif cycle == 0: # only need to save to local once
+                if src_pe in dests:
+                    continue
                 local = src_pe.namespace_map[localns]
-                dests.append()
+                dests.append(Dest(localns, local.tail))
         if len(dests) == 3:
             break
+
+
+def gen_dest_insts(dests, curr_pe):
+    dest_insts = []
+    for dest in dests:
+        if type(dest) == Dest:
+            dest_insts.append(dest)
+        else:
+            dest_insts.append(get_dest(curr_pe, dest, 8))
+    fill_null(dest_insts, isdst=True)
+    return dest_insts
+
+
+def get_interim(dest_insts):
+    for dest in dest_insts:
+        if dest.namespace == 'NI':
+            return dest
+
+
+def gen_src_insts(src_pes, curr_pe, interim, cycle):
+    src_insts = []
+    if cycle == 0:
+        for src_pe in src_pes:
+            if src_pe.id == curr_pe.id: # TODO
+                
+                ns = curr_pe.namespace_map[interim]
+                index = str(ns.tail - 1)
+            else:
+                ns = get_ns(src_pe, curr_pe)
+                index = str(src_pe.id)
+            src_insts.append(Source(ns, index))
+    else:
+        src_insts.append(Source(interim.namespace, interim.index))
+
+    fill_null(src_insts, isdst=False)
+    return src_insts
 
 
 def get_ns(src_pe, dest_pe):

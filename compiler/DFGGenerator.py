@@ -183,9 +183,9 @@ class DFGGenerator:
                     resultNode = self.exprTraversal(statNode.getChild(2), iterDict)
 
                     # color
-                    print('debug...statTraversal...var is: ', var)
-                    print('debug...statTraversal...var type is: ', type(var))
-                    print('debug...statTraversal...gradientTable is: ', self.gradientTable)
+                    #print('debug...statTraversal...var is: ', var)
+                    #print('debug...statTraversal...var type is: ', type(var))
+                    #print('debug...statTraversal...gradientTable is: ', self.gradientTable)
                     if var in self.gradientTable:
                         #resultNode.dataType = 'gradient'
                         resultNode.dataType = None
@@ -479,7 +479,7 @@ class DFGGenerator:
                                     self.dfg.add(node)
                                     self.connectNode(self.dfg.get(0), node)
                                     symTable[stringKey] = node
-        print('after createSymbolTable()...', gradientTable)
+        #print('after createSymbolTable()...', gradientTable)
         return (symTable, gradientTable)
 
     def createFuncTypeTable(self):

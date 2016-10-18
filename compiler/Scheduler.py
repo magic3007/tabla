@@ -50,11 +50,11 @@ class Scheduler:
                     count = dfg.getSize() - 1
 
         # Print schedule
-        print("*********************")
-        for i in range(len(self.schedule)):
-            print("\n*****cycle " + str(i) + "*****\n")
-            for node in self.schedule[i]:
-                print(node)
+        #print("*********************")
+        #for i in range(len(self.schedule)):
+            #print("\n*****cycle " + str(i) + "*****\n")
+            #for node in self.schedule[i]:
+                #print(node)
         return self.schedule
 
 
