@@ -296,7 +296,7 @@ def multicast(curr_pe, dest_pes, src_pes, op, source):
         for pu in grouped:
             if curr_pe.pu.id == pu.id:
                 continue
-            within_pu(pu.head_pe, grouped[pu], repr_pe, False, op)
+            within_pu(pu.head_pe, grouped[pu], [repr_pe], False, 'pass')
 
 
 def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None):
@@ -318,8 +318,11 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None):
 
     # send to interim namesapce, if necessary
     if curr_pe in dest_pes:
-        dests.append(curr_pe)
+        #dests.append(curr_pe)
         dest_pes.remove(curr_pe)
+        ni = curr_pe.namespace_map['NI']
+        dests.append(Dest('NI', ni.tail))
+        ni.insert(ni.tail, Ns_entry())
 
     while True:
         # fill dests
@@ -370,6 +373,7 @@ def inter_pu(repr_pe, dest_pes, src_pes, op, source):
         inst = Inst(opcode, dest_insts, src_insts)
         repr_pe.add_inst(inst)
         cycle += 1
+        dests = []
     return
 
 
@@ -378,26 +382,54 @@ def select_dests(dest_pes, src_pe, dests, localns, cycle):
     From the given target PE's, select up to 3 and fill up
     dests array.
     '''
-    ns_used = []
+    if cycle == 0:
+        # saves to interim only if necessary
+        save_to_interim(dest_pes, src_pe, dests)
 
-    for i, dest_pe in enumerate(dest_pes):
+    ns_used = []
+    for dest_pe in dest_pes[:]:
         ns = get_ns(src_pe, dest_pe)
         if ns not in ns_used:
             ns_used.append(ns)
             dests.append(dest_pe)
-            dest_pes.pop(i)
-        if len(dests) == 2: # TODO: fix this logic
+            dest_pes.remove(dest_pe)
+        if len(dests) == 2:
             if len(dest_pes) == 1 and get_ns(src_pe, dest_pe) not in ns_used:
                 dests.append(dest_pe)
-                dest_pes.pop(i)
-            elif cycle == 0: # only need to save to local once
-                if src_pe in dests:
-                    continue
-                local = src_pe.namespace_map[localns]
-                dests.append(Dest(localns, local.tail))
+                dest_pes.remove(dest_pe)
+                break
         if len(dests) == 3:
             break
 
+
+def save_to_interim(dest_pes, src_pe, dests):
+    '''
+    Saves data to interim namespace, if necessary.
+    '''
+    for d in dests:
+        if type(d) == Dest:
+            return
+    #if src_pe in dests:
+        #return
+    nsmap = {}
+    for dest_pe in dest_pes:
+        ns = get_ns(src_pe, dest_pe)
+        if ns not in nsmap:
+            nsmap[ns] = [dest_pe]
+        else:
+            nsmap[ns].append(dest_pe)
+
+    mult_cycles = False
+    for nskey in nsmap:
+        if len(nsmap[nskey]) > 1:
+            mult_cycles = True
+
+    if len(nsmap) > 3 or mult_cycles:
+        interim = src_pe.namespace_map['NI']
+        dests.append(Dest('NI', interim.tail))
+        interim.insert(interim.tail, Ns_entry())
+    return
+    
 
 def gen_dest_insts(dests, curr_pe):
     dest_insts = []
@@ -776,7 +808,7 @@ def get_dest(curr_pe, child_pe, pe_per_pu, node=None):
         if curr_pe.pu.next_pu.id == child_pe.pu.id:
             namespace = curr_pe.namespace_map["NB0_out"]
             namespace.insert(namespace.tail, Ns_entry())
-            return Dest("NB", str(child_pe.id) + "0")
+            return Dest("NN", str(child_pe.id) + "1")
         else:
             namespace = curr_pe.namespace_map["NB1_out"]
             namespace.insert(namespace.tail, Ns_entry())
