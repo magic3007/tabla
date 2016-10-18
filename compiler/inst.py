@@ -275,13 +275,14 @@ def multicast(curr_pe, dest_pes, src_pes, op, source):
     if len(grouped) > 1 or len(grouped) == 1 and curr_pe.pu not in grouped:
         need_interpu = True
 
+    repr_src = src_pes
     # first, send data to the PE's in this PU
     if curr_pe.pu in grouped:
         repr_src = within_pu(curr_pe, grouped[curr_pe.pu], src_pes, need_interpu, op, source)
         op = 'pass'
     elif need_interpu and not curr_pe.isrepr:
+        repr_src = within_pu(curr_pe, [curr_pe.pu.head_pe], src_pes, need_interpu, op, source)
         op = 'pass'
-        pass # TODO
 
     # send from repr PE to other repr PE's in other PU's
     if need_interpu:
@@ -289,7 +290,7 @@ def multicast(curr_pe, dest_pes, src_pes, op, source):
         target_repr_pus = list(grouped.keys()) # keys() are PU id's
         target_repr_pes = [pu.head_pe for pu in target_repr_pus]
 
-        inter_pu(repr_pe, target_repr_pes, repr_src, op)
+        inter_pu(repr_pe, target_repr_pes, repr_src, op, source)
 
         # at each repr PE, send to target PE's in its own PU
         for pu in grouped:
@@ -320,7 +321,7 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None):
         dests.append(curr_pe)
         dest_pes.remove(curr_pe)
 
-    while len(dest_pes) > 0:
+    while True:
         # fill dests
         select_dests(dest_pes, curr_pe, dests, 'NI', cycle)
         dest_insts = gen_dest_insts(dests, curr_pe)
@@ -334,14 +335,16 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None):
             opcode = 'pass'
         inst = Inst(opcode, dest_insts, src_insts)
         curr_pe.add_inst(inst)
-
         cycle += 1
         dests = []
+        
+        if not len(dest_pes) > 0:
+            break
 
     return repr_src
 
 
-def inter_pu(repr_pe, dest_pes, src_pes, op):
+def inter_pu(repr_pe, dest_pes, src_pes, op, source):
     '''
     Handles multicasting among different PU's through repr PE's
     '''
@@ -350,7 +353,7 @@ def inter_pu(repr_pe, dest_pes, src_pes, op):
 
     while len(dest_pes) > 0:
         select_dests(dest_pes, repr_pe, dests, 'NI', cycle)
-        dest_insts = gen_dets_inst(dests, repr_pe)
+        dest_insts = gen_dest_insts(dests, repr_pe)
         interim = get_interim(dest_insts)
         if type(src_pes) == Dest:
             src_insts = []
@@ -359,7 +362,7 @@ def inter_pu(repr_pe, dest_pes, src_pes, op):
             src_insts.append(Source(ns, index))
             fill_null(src_insts, isdst=False)
         else:
-            src_insts = gen_src_insts(src_pes, repr_pe, interim, cycle)
+            src_insts = gen_src_insts(src_pes, repr_pe, interim, source, cycle)
         if op != 'pass' and cycle == 0:
             opcode = op
         else:
@@ -383,7 +386,7 @@ def select_dests(dest_pes, src_pe, dests, localns, cycle):
             ns_used.append(ns)
             dests.append(dest_pe)
             dest_pes.pop(i)
-        if len(dests) == 2:
+        if len(dests) == 2: # TODO: fix this logic
             if len(dest_pes) == 1 and get_ns(src_pe, dest_pe) not in ns_used:
                 dests.append(dest_pe)
                 dest_pes.pop(i)
@@ -422,7 +425,6 @@ def gen_src_insts(src_pes, curr_pe, interim, source, cycle):
             else:
                 ns = get_ns(src_pe, curr_pe)
                 index = str(src_pe.id) + str(ns[-1])
-                print(ns[:-1], index)
                 src_insts.append(Source(ns[:-1], index))
     else:
         src_insts.append(Source(interim.namespace, interim.index))
@@ -439,7 +441,7 @@ def get_ns(src_pe, dest_pe):
         return 'NN0'
     elif src_pe.pu.id == dest_pe.pu.id:
         return 'NB0'
-    elif src_pe.pu.next.id == dest_pe.pu.id:
+    elif src_pe.pu.next_pu.id == dest_pe.pu.id:
         return 'NN1'
     else:
         return 'NB1'
