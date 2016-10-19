@@ -274,13 +274,21 @@ def generate_inst(node_graph, pe_per_pu):
 
 
 def get_src_multicast(curr_pe, parent_pe):
+    '''
+    Get source instruction for one of the target nodes from 
+    a multicast
+    '''
     if curr_pe.pu.id == parent_pe.pu.id:
         namespace = get_ns(parent_pe, curr_pe)
         index = str(parent_pe.id) + namespace[-1]
     elif curr_pe.isrepr():
-        parent_repr = parent_pe.pu.head_pe
-        namespace = get_ns(parent_repr, curr_pe)
-        index = str(parent_repr.pu.id) + namespace[-1]
+        latest_inst = curr_pe.inst[-1]
+        for src in latest_inst.srcs:
+            if src.namespace == 'NI':
+                return src
+        # parent_repr = parent_pe.pu.head_pe
+        # namespace = get_ns(parent_repr, curr_pe)
+        # index = str(parent_repr.pu.id) + namespace[-1]
     else:
         namespace = get_ns(curr_pe.pu.head_pe, curr_pe)
         index = str(curr_pe.pu.head_pe.id) + namespace[-1]
@@ -329,6 +337,7 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None, peid_to
 
     # send to repr PE, if necessary
     repr_src = None
+    # repr_src is the source instruction for representative PE
     if need_interpu and not curr_pe.isrepr():
         dests.append(curr_pe.pu.head_pe)
         if curr_pe.pu.head_pe in dest_pes: # if repr PE already in target PE
