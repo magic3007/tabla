@@ -106,6 +106,7 @@ data_type_to_ns = {
     None: "NI"
 }
 
+
 def generate_inst(node_graph, pe_per_pu):
     '''
     For each node in dfg, generate an instruction.
@@ -296,10 +297,10 @@ def multicast(curr_pe, dest_pes, src_pes, op, source):
         for pu in grouped:
             if curr_pe.pu.id == pu.id:
                 continue
-            within_pu(pu.head_pe, grouped[pu], [repr_pe], False, 'pass')
+            within_pu(pu.head_pe, grouped[pu], [repr_pe], False, 'pass', peid_to_puid=True)
 
 
-def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None):
+def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None, peid_to_puid=False):
     '''
     Handles multicasting within a single PU.
     Returns namespace and index of source for repr PE.
@@ -333,7 +334,9 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None):
         if cycle == 0:
             interim = get_interim(dest_insts)
         src_insts = gen_src_insts(src_pes, curr_pe, interim, source, cycle)
-        
+        if peid_to_puid:
+            format_peid_to_puid(src_insts)
+
         if cycle == 0:
             opcode = op
         else:
@@ -365,6 +368,7 @@ def inter_pu(repr_pe, dest_pes, src_pes, op, source):
     while len(dest_pes) > 0:
         select_dests(dest_pes, repr_pe, dests, 'NI', cycle)
         dest_insts = gen_dest_insts(dests, repr_pe)
+        format_peid_to_puid(dest_insts)
         interim = get_interim(dest_insts)
         if type(src_pes) == Source:
             src_insts = []
@@ -384,6 +388,14 @@ def inter_pu(repr_pe, dest_pes, src_pes, op, source):
         dests = []
     return
 
+
+def format_peid_to_puid(dest_or_src):
+    for entry in dest_or_src:
+        if (entry.namespace == 'NN' or entry.namespace == 'NB') and entry.index[-1] == '1':
+            peid = int(entry.index[:-1])
+            puid = peid // 8
+            entry.index = str(puid) + entry.index[-1]
+    
 
 def select_dests(dest_pes, src_pe, dests, localns, cycle):
     '''
