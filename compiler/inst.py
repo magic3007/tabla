@@ -69,7 +69,7 @@ class Inst:
                 if src is not None:
                     s.append(src.toDict())
                 else:
-                    emptysrc = Source()
+                    emptysrc = Source('NL', 0)
                     s.append(emptysrc.toDict())
             d["srcs"] = s
         else:
@@ -309,12 +309,14 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None):
 
     # send to repr PE, if necessary
     repr_src = None
-    if need_interpu and not curr_pe.isrepr:
+    if need_interpu and not curr_pe.isrepr():
         dests.append(curr_pe.pu.head_pe)
         if curr_pe.pu.head_pe in dest_pes: # if repr PE already in target PE
             dest_pes.remove(curr_pe.pu.head_pe)
-        d = gen_dest_insts(dests, curr_pe)
-        repr_src = d[0]
+        s = gen_src_insts([curr_pe], curr_pe.pu.head_pe, None, None, 0)
+        repr_src = s[0]
+        #d = gen_dest_insts(dests, curr_pe)
+        #repr_src = d[0]
 
     # send to interim namesapce, if necessary
     if curr_pe in dest_pes:
@@ -354,11 +356,17 @@ def inter_pu(repr_pe, dest_pes, src_pes, op, source):
     dests = [] # PU's
     cycle = 0
 
+    if repr_pe in dest_pes:
+        dest_pes.remove(repr_pe)
+        ni = repr_pe.namespace_map['NI']
+        dests.append(Dest('NI', ni.tail))
+        ni.insert(ni.tail, Ns_entry())
+
     while len(dest_pes) > 0:
         select_dests(dest_pes, repr_pe, dests, 'NI', cycle)
         dest_insts = gen_dest_insts(dests, repr_pe)
         interim = get_interim(dest_insts)
-        if type(src_pes) == Dest:
+        if type(src_pes) == Source:
             src_insts = []
             ns = src_pes.namespace
             index = src_pes.index
@@ -452,7 +460,7 @@ def gen_src_insts(src_pes, curr_pe, interim, source, cycle):
     src_insts = []
     if cycle == 0:
         for src_pe in src_pes:
-            if src_pe.id == curr_pe.id: # TODO
+            if src_pe.id == curr_pe.id:
                 src_insts.append(source)
             else:
                 ns = get_ns(src_pe, curr_pe)
