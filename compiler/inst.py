@@ -160,7 +160,11 @@ def generate_inst(node_graph, pe_per_pu):
                 else: # single target PE
                     srcs = []
                     for parent_node in node.parents:
-                        src = get_src(node, parent_node, pe_per_pu)
+                        # TODO: kind of a quick fix...
+                        if len(parent_node.children) > 1 and parent_node.parents != ['Source']: # multicasting happend
+                            src = get_src_multicast(node.pe, parent_node.pe)
+                        else:
+                            src = get_src(node, parent_node, pe_per_pu)
                         srcs.append(src)
                     fill_null(srcs, isdst=False)
                     if node.children == ["Sink"]: # if child is sink, set child to model(w) node
@@ -267,6 +271,21 @@ def generate_inst(node_graph, pe_per_pu):
 
         cycl += 1
         nodes = node_graph.get_nodes_in_cycle(cycl)
+
+
+def get_src_multicast(curr_pe, parent_pe):
+    if curr_pe.pu.id == parent_pe.pu.id:
+        namespace = get_ns(parent_pe, curr_pe)
+        index = str(parent_pe.id) + namespace[-1]
+    elif curr_pe.isrepr():
+        parent_repr = parent_pe.pu.head_pe
+        namespace = get_ns(parent_repr, curr_pe)
+        index = str(parent_repr.pu.id) + namespace[-1]
+    else:
+        namespace = get_ns(curr_pe.pu.head_pe, curr_pe)
+        index = str(curr_pe.pu.head_pe.id) + namespace[-1]
+
+    return Source(namespace[:-1], index)
 
 
 def multicast(curr_pe, dest_pes, src_pes, op, source):
