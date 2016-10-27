@@ -15,7 +15,7 @@ class DFGGenerator:
     def create(self, tree):
         self.parseTree = tree
         self.dfg = DataFlowGraph()
-        self.funcTypeTable = {}
+        #self.funcTypeTable = {}
 
         # Create source and sink nodes first.
         source = DFGNode()
@@ -33,13 +33,13 @@ class DFGGenerator:
         self.iterTable = self.createIterTable(self.constTable)
         self.symTable, self.gradientTable = self.createSymbolTable(self.constTable)
         self.funcTypeTable = self.createFuncTypeTable()
-        # print('const table',self.constTable)
-        # print('iter table',self.iterTable)
-        # print('symTable',self.symTable)
-        # print('funcTypeTable',self.funcTypeTable)
+        print('const table',self.constTable)
+        print('iter table',self.iterTable)
+        print('symTable',self.symTable)
+        print('funcTypeTable',self.funcTypeTable)
         # print('gradientTable', self.gradientTable)
-
         # print("================================\n\n")
+
         # Get statList for all Stats
         statList = self.parseTree.getChild(1)
 
@@ -142,13 +142,14 @@ class DFGGenerator:
         # print('iter table',self.iterTable)
         # print('symTable',self.symTable)
 
-#        self.dfg.save('./dfg.json')
+        # self.dfg.save('./dfg.json')
 
         return self.dfg
 
 
     def writeTo(self, dfg, path):
         dfg.save(path)
+
 
     def statTraversal(self, statNode):
         # print(statNode.getText())
@@ -176,6 +177,7 @@ class DFGGenerator:
                         resultNode = self.exprTraversal(statNode.getChild(2), iterDict)
                         # color
                         if var in self.gradientTable:
+                            #resultNode.dataType = 'gradient'
                             resultNode.dataType = 'gradient'
                         self.symTable[var + '[' + str(i) + '][' + str(j) + ']'] = resultNode
                         arr.append(resultNode)
@@ -194,7 +196,6 @@ class DFGGenerator:
                     arr.append(resultNode)
 
         return arr
-
 
 
     def exprTraversal(self, exprNode, iterDict):
@@ -226,6 +227,7 @@ class DFGGenerator:
 
         return node
 
+
     def term2Traversal(self, term2Node, iterDict):
         # print('term2Traversal ' + term2Node.getText())
         if term2Node.getChild(1).children is not None:
@@ -255,6 +257,7 @@ class DFGGenerator:
 
         return node
 
+
     def term1Traversal(self, term1Node, iterDict):
         # print('term1Traversal ' + term1Node.getText())
         if term1Node.getChild(1).children is not None:
@@ -283,6 +286,7 @@ class DFGGenerator:
         self.connectNode(rightParent, node)
 
         return node
+
 
     def term0Traversal(self, currTerm0, iterDict):
         # print('term0Traversal ' + currTerm0.getText())
@@ -328,6 +332,7 @@ class DFGGenerator:
         else:
             return self.funcMultiParentTraversal(currTerm0, iterDict)
 
+
     def funcSingleParentTraversal(self, currTerm0, iterDict):
         node = DFGNode()
         node.operation = currTerm0.getChild(0).getText()
@@ -335,6 +340,7 @@ class DFGGenerator:
         self.dfg.add(node)
         self.connectNode(parent, node)
         return node
+
 
     def funcMultiParentTraversal(self, currTerm0, iterDict):
         funcArgs = currTerm0.getChild(1)
@@ -392,6 +398,7 @@ class DFGGenerator:
 
         return constTable
 
+
     def createIterTable(self, constTable):
         iterTable = {}
 
@@ -413,6 +420,7 @@ class DFGGenerator:
                 iterTable[key] = (val1, val2);
 
         return iterTable
+
                 
     def createSymbolTable(self, constTable):
         symTable = {}

@@ -64,21 +64,35 @@ class DotGenerator:
         # print(dotCode)
         return dotCode
 
+
+    nodecolor = {
+        'model_input': 'skyblue',
+        'model_output': 'hotpink',
+        'model': 'yellow',
+        'constant': 'gray'
+    }
+
     def getLabel(self, node):
+        if node.dataType in DotGenerator.nodecolor:
+            color = DotGenerator.nodecolor[node.dataType]
+        else:
+            color = None
         # data type color
-        if node.dataType == 'model_input':
-            color = 'skyblue'
-        elif node.dataType == 'model_output':
-            color = 'hotpink'
-        elif node.dataType == 'model':
-            color = 'yellow'
+        # if node.dataType == 'model_input':
+        #     color = 'skyblue'
+        # elif node.dataType == 'model_output':
+        #     color = 'hotpink'
+        # elif node.dataType == 'model':
+        #     color = 'yellow'
         # elif node.dataType == 'gradient':
         #     color = 'green'
-        elif node.dataType == 'constant':
-            color = 'gray'
-        else:
+        # elif node.dataType == 'constant':
+        #     color = 'gray'
+        if color is None:
             return '{"' + str(node.id) + '" [label="' + node.operation + '"]' + '}'
-        return '{"' + str(node.id) + '" [label="' + node.operation + '" style=filled fillcolor="' + color + '"]' + '}'
+        else:
+            return '{"' + str(node.id) + '" [label="' + node.operation + '" style=filled fillcolor="' + color + '"]' + '}'
+
 
     def writeTo(self, dotCode, path):
         # Write to file

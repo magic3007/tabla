@@ -128,7 +128,7 @@ def generate_inst(node_graph, pe_per_pu):
             if node.parents == ["Source"]: # initial data nodes
                 inst = Inst()
                 dests = []
-                if node.pe is None: # constants without pe assignment
+                if node.pe is None: # constants without pe assignment (e.g. mu)
                     namespace_id = data_type_to_ns[node.outDataType]
                     for child in node.children:
                         namespace = child.pe.namespace_map[namespace_id]
@@ -281,7 +281,7 @@ def get_src_multicast(curr_pe, parent_pe):
     if curr_pe.pu.id == parent_pe.pu.id:
         namespace = get_ns(parent_pe, curr_pe)
         index = str(parent_pe.id) + namespace[-1]
-    elif curr_pe.isrepr():
+    elif curr_pe.isrepr(): # Quick fix
         latest_inst = curr_pe.inst[-1]
         for src in latest_inst.srcs:
             if src.namespace == 'NI':
@@ -308,7 +308,7 @@ def multicast(curr_pe, dest_pes, src_pes, op, source):
     if curr_pe.pu in grouped:
         repr_src = within_pu(curr_pe, grouped[curr_pe.pu], src_pes, need_interpu, op, source)
         op = 'pass'
-    elif need_interpu and not curr_pe.isrepr:
+    elif need_interpu and not curr_pe.isrepr():
         repr_src = within_pu(curr_pe, [curr_pe.pu.head_pe], src_pes, need_interpu, op, source)
         op = 'pass'
 

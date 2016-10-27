@@ -16,6 +16,7 @@ from pu import Pu
 from pe import Pe
 import fileformat
 import mem_interface
+from gendot import gendot
 
 
 def read_config(filename):
@@ -83,7 +84,7 @@ def main(argv):
     
     # graph creation should happen here
     #print('\n\n================================')
-    dfg_file = 'artifacts/dfg.json'
+    dfg_file = './artifacts/dfg.json'
     dfgGenerator = DFGGenerator()
     dfg = dfgGenerator.create(tree)
     dfgGenerator.writeTo(dfg, dfg_file)
@@ -119,6 +120,11 @@ def main(argv):
     dfg.set_parents_and_children()
     node_ir.assign_pes(dfg, num_pes, schedule, ns_size, ns_int_size, pu_pe)
     dfg.writeTo("./artifacts/nodes_ir.json")
+
+    # generate dot with PE numbers printed
+    dotf = './artifacts/tabla_peid.dot'
+    dotcode = gendot(dfg, cycle2id)
+    dotGenerator.writeTo(dotcode, dotf)
 
     #dfg = inst.readFrom("./artifacts/nodes_ir.json")
     # instruction generation
