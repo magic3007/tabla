@@ -283,7 +283,6 @@ def gen_meminst(m):
     writeTo('./meminst.txt', binary)
 
 
-
 if __name__ == "__main__":
     m = int(sys.argv[1])
     data = init_data(m) # data set in one iteration (e.g. x[0] ... x[63])

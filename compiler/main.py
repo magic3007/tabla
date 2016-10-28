@@ -17,6 +17,7 @@ from pe import Pe
 import fileformat
 import mem_interface
 from gendot import gendot
+import weight
 
 
 def read_config(filename):
@@ -196,7 +197,8 @@ def main(argv):
     # m += modelout
     #mem_interface.gen_meminst(m)
     mem_interface.gen_meminst(len(xy_nodes))
-
+    wconf = weight.gen_weightconf(w_nodes)
+    weight.writeTo('./config.vh', wconf)
 
 
 def count_modeloutput(sym_table):
