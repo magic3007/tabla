@@ -155,6 +155,7 @@ class DFGGenerator:
         # print(statNode.getText())
         leftHS = statNode.getChild(0).getText()
         var = leftHS[0:leftHS.find("[")]
+        # dimensions of left hs var - could be up to two
         dimensions = statNode.getChild(0).getChild(0).getChild(1).getText()[1:-1].split("][")
 
         arr = []
@@ -372,16 +373,32 @@ class DFGGenerator:
 
         # Combines nodes in list with operator node
         #   and inserts operator node back in list
-        while (len(funcVals) > 1):
-            # print(len(funcVals))
-            left = funcVals.pop(0)
-            right = funcVals.pop(0)
-            node = DFGNode()
-            node.operation = operator
-            self.dfg.add(node)
-            self.connectNode(right, node)
-            self.connectNode(left, node)
-            funcVals.append(node)
+        # while (len(funcVals) > 1):
+        #     # print(len(funcVals))
+        #     left = funcVals.pop(0)
+        #     right = funcVals.pop(0)
+        #     node = DFGNode()
+        #     node.operation = operator
+        #     self.dfg.add(node)
+        #     self.connectNode(right, node)
+        #     self.connectNode(left, node)
+        #     funcVals.append(node)
+
+        while len(funcVals) > 1:
+            funcVals_tmp = []
+            while len(funcVals) >= 2:
+                left = funcVals.pop(0)
+                right = funcVals.pop(0)
+                node = DFGNode()
+                node.operation = operator
+                self.dfg.add(node)
+                self.connectNode(right, node)
+                self.connectNode(left, node)
+                funcVals_tmp.append(node)
+
+            if len(funcVals) == 1:
+                funcVals_tmp.append(funcVals.pop(0))
+            funcVals = funcVals_tmp
 
         return funcVals.pop(0)
 

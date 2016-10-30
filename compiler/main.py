@@ -189,14 +189,10 @@ def main(argv):
             f.write('\n' + special_mod)
 
     # generate memory instructions
-    # m = dfgGenerator.constTable['m']
-    # modelout = count_modeloutput(dfgGenerator.symTable)
     xy_nodes, w_nodes = node_ir.classify_initial_nodes(dfg)
-    #print('model_input and model_output count: {:d}'.format(len(xy_nodes)))
-    #print('model output count: {:d}'.format(modelout))
-    # m += modelout
-    #mem_interface.gen_meminst(m)
     mem_interface.gen_meminst(len(xy_nodes))
+
+    # generate weight config
     wconf = weight.gen_weightconf(w_nodes)
     weight.writeTo('./config.vh', wconf)
 

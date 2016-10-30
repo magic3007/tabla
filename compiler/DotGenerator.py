@@ -5,9 +5,6 @@ import json
 
 class DotGenerator:
 
-    def __init__(self):
-        pass
-
     def generateDot(self, importedDFG, cycle2id):
         dfg = copy.copy(importedDFG)
         # for val in dfg.nodes:
@@ -50,7 +47,7 @@ class DotGenerator:
 
             visitedList.add(currNode)
 
-        ### append rank here ###
+        # append rank
         srcNode = dfg.get(0)
         srcImmChildren = []
         for child in srcNode.children:
