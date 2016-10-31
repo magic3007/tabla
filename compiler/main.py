@@ -194,7 +194,7 @@ def main(argv):
 
     # generate weight config
     wconf = weight.gen_weightconf(w_nodes)
-    weight.writeTo('./config.vh', wconf)
+    weight.writeTo('./weightInst.txt', wconf)
 
 
 def count_modeloutput(sym_table):
