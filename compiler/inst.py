@@ -504,8 +504,17 @@ def gen_src_insts(src_pes, curr_pe, interim, source, cycle):
                 src_insts.append(source)
             else:
                 ns = get_ns(src_pe, curr_pe)
-                index = str(src_pe.id) + str(ns[-1])
-                src_insts.append(Source(ns[:-1], index))
+                if ns[-1] == '1':
+                    if curr_pe.id == curr_pe.pu.head_pe.id:
+                        index = str(src_pe.pu.id) + '1'
+                        namespace = get_ns(src_pe.pu.head_pe, curr_pe)
+                        src_insts.append(Source(namespace[:-1], index))
+                    else:
+                        index = str(curr_pe.pu.head_pe.id) + '0'
+                        namespace = get_ns(curr_pe.pu.head_pe, curr_pe)
+                        src_insts.append(Source(namespace[:-1], index))
+                # index = str(src_pe.id) + str(ns[-1])
+                # src_insts.append(Source(ns[:-1], index))
     else:
         src_insts.append(Source(interim.namespace, interim.index))
 
@@ -872,12 +881,20 @@ def get_src(node, parent_node, pe_per_pu):
             if dest.dest_node_id == node.id:
                 ns = dest.namespace
                 if ns == "NB" or ns == "NN":
-                    if dest.index[-1] == '1':
-                        src_pu = find_src_pe(node.pe, parent_node.pe)
-                        return Source(dest.namespace, str(src_pu.id) + dest.index[-1])
-                    elif dest.index[-1] == '0':
-                        src_pe = find_src_pe(node.pe, parent_node.pe)
-                        return Source(dest.namespace, str(src_pe.id) + dest.index[-1])
+                    if dest.index[-1] == '1': # inter-pu
+                        # src_pu = find_src_pe(node.pe, parent_node.pe)
+                        # return Source(dest.namespace, str(src_pu.id) + dest.index[-1])
+                        if node.pe == node.pe.pu.head_pe:
+                            src_index = parent_node.pe.pu.id
+                            return Source(dest.namespace, str(src_index) + '1')
+                        else:
+                            src_index = node.pe.pu.head_pe.id
+                            namespace = get_ns(node.pe.pu.head_pe, node.pe)
+                            return Source(namespace[:-1], str(src_index) + '0')
+                    elif dest.index[-1] == '0': # inter-pe
+                        # src_pe = find_src_pe(node.pe, parent_node.pe)
+                        # return Source(dest.namespace, str(src_pe.id) + dest.index[-1])
+                        return Source(dest.namespace, str(parent_node.pe.id) + dest.index[-1])
                 else:
                     if dest.namespace == "NM":
                         ns = node.pe.namespace_map[dest.namespace]
