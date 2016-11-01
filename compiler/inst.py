@@ -435,6 +435,12 @@ def select_dests(dest_pes, src_pe, dests, localns, cycle):
         save_to_interim(dest_pes, src_pe, dests)
 
     ns_used = []
+    # record namespace of already picked dests
+    for dest in dests:
+        if type(dest) == Pe:
+            ns = get_ns(src_pe, dest)
+            ns_used.append(ns)
+    
     for dest_pe in dest_pes[:]:
         ns = get_ns(src_pe, dest_pe)
         if ns not in ns_used:
@@ -885,12 +891,14 @@ def get_src(node, parent_node, pe_per_pu):
                         # src_pu = find_src_pe(node.pe, parent_node.pe)
                         # return Source(dest.namespace, str(src_pu.id) + dest.index[-1])
                         if node.pe == node.pe.pu.head_pe:
-                            src_index = parent_node.pe.pu.id
-                            return Source(dest.namespace, str(src_index) + '1')
+                            src_index = str(parent_node.pe.pu.id) + '1'
+                            namespace = get_ns(parent_node.pe.pu.head_pe, node.pe)
+                            #return Source(dest.namespace, src_index)
+                            return Source(namespace[:-1], src_index)
                         else:
-                            src_index = node.pe.pu.head_pe.id
+                            src_index = str(node.pe.pu.head_pe.id) + '0'
                             namespace = get_ns(node.pe.pu.head_pe, node.pe)
-                            return Source(namespace[:-1], str(src_index) + '0')
+                            return Source(namespace[:-1], src_index)
                     elif dest.index[-1] == '0': # inter-pe
                         # src_pe = find_src_pe(node.pe, parent_node.pe)
                         # return Source(dest.namespace, str(src_pe.id) + dest.index[-1])
