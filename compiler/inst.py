@@ -278,7 +278,7 @@ def get_src_multicast(curr_pe, parent_pe):
     Get source instruction for one of the target nodes from 
     a multicast
     '''
-    if curr_pe.pu.id == parent_pe.pu.id:
+    if curr_pe.pu.id == parent_pe.pu.id and not curr_pe.isrepr():
         namespace = get_ns(parent_pe, curr_pe)
         index = str(parent_pe.id) + namespace[-1]
     elif curr_pe.isrepr(): # Quick fix
@@ -327,37 +327,59 @@ def multicast(curr_pe, dest_pes, src_pes, op, source):
             within_pu(pu.head_pe, grouped[pu], [repr_pe], False, 'pass', peid_to_puid=True)
 
 
-def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None, peid_to_puid=False):
+def within_pu(curr_pe, target_pes, src_pes, need_interpu, op, source=None, peid_to_puid=False):
     '''
     Handles multicasting within a single PU.
     Returns namespace and index of source for repr PE.
     '''
     cycle = 0
-    dests = [] # PEs
+    dests = [] # destination PEs to choose per cycle - up to 3
 
     # send to repr PE, if necessary
     repr_src = None
     # repr_src is the source instruction for representative PE
-    if need_interpu and not curr_pe.isrepr():
-        dests.append(curr_pe.pu.head_pe)
-        if curr_pe.pu.head_pe in dest_pes: # if repr PE already in target PE
-            dest_pes.remove(curr_pe.pu.head_pe)
-        s = gen_src_insts([curr_pe], curr_pe.pu.head_pe, None, None, 0)
+    # if need_interpu and not curr_pe.isrepr():
+    #     dests.append(curr_pe.pu.head_pe)
+    #     if curr_pe.pu.head_pe in target_pes: # if repr PE already in target PE
+    #         target_pes.remove(curr_pe.pu.head_pe)
+    #     s = gen_src_insts([curr_pe], curr_pe.pu.head_pe, None, None, 0)
+    #     repr_src = s[0]
+    repr_pe = curr_pe.pu.head_pe
+    if need_interpu and repr_pe not in target_pes:
+        dests.append(repr_pe)
+        target_pes.append(repr_pe)
+
+    if not curr_pe.isrepr():
+        s = gen_src_insts([curr_pe], repr_pe, None, None, 0)
         repr_src = s[0]
-        #d = gen_dest_insts(dests, curr_pe)
-        #repr_src = d[0]
 
     # send to interim namesapce, if necessary
-    if curr_pe in dest_pes:
-        #dests.append(curr_pe)
-        dest_pes.remove(curr_pe)
+    if curr_pe in target_pes:
+        target_pes.remove(curr_pe)
         ni = curr_pe.namespace_map['NI']
         dests.append(Dest('NI', ni.tail))
         ni.insert(ni.tail, Ns_entry())
+        if curr_pe.isrepr():
+            repr_src = Source('NI', ni.tail)
 
+    print('curr pe:', curr_pe.id)
+    print('selected dest:')
+    for i in dests:
+        print(i)
+    print('target_pes:')
+    for i in target_pes:
+        print(i.id)
+    print('*'*10)
     while True:
         # fill dests
-        select_dests(dest_pes, curr_pe, dests, 'NI', cycle)
+        select_dests(target_pes, curr_pe, dests, 'NI', cycle)
+        for i in dests:
+            if type(i) == Pe:
+                print(i.id)
+            else:
+                print(i)
+        print('-' * 10)
+
         dest_insts = gen_dest_insts(dests, curr_pe)
         if cycle == 0:
             interim = get_interim(dest_insts)
@@ -374,7 +396,7 @@ def within_pu(curr_pe, dest_pes, src_pes, need_interpu, op, source=None, peid_to
         cycle += 1
         dests = []
         
-        if not len(dest_pes) > 0:
+        if not len(target_pes) > 0:
             break
 
     return repr_src
@@ -397,8 +419,9 @@ def inter_pu(repr_pe, dest_pes, src_pes, op, source):
         select_dests(dest_pes, repr_pe, dests, 'NI', cycle)
         dest_insts = gen_dest_insts(dests, repr_pe)
         format_peid_to_puid(dest_insts)
-        interim = get_interim(dest_insts)
-        if type(src_pes) == Source:
+        if cycle == 0:
+            interim = get_interim(dest_insts)
+        if cycle == 0 and type(src_pes) == Source:
             src_insts = []
             ns = src_pes.namespace
             index = src_pes.index
@@ -519,6 +542,9 @@ def gen_src_insts(src_pes, curr_pe, interim, source, cycle):
                         index = str(curr_pe.pu.head_pe.id) + '0'
                         namespace = get_ns(curr_pe.pu.head_pe, curr_pe)
                         src_insts.append(Source(namespace[:-1], index))
+                else:
+                    index = str(src_pe.id) + str(ns[-1])
+                    src_insts.append(Source(ns[:-1], index))
                 # index = str(src_pe.id) + str(ns[-1])
                 # src_insts.append(Source(ns[:-1], index))
     else:
