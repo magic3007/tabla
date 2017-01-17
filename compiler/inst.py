@@ -62,7 +62,6 @@ class Inst:
         d = {}
         d["op"] = self.op
         d["dests"] = [dest.toDict() for dest in self.dests] if self.dests is not None else None
-        #d["srcs"] = [src.toDict() for src in self.srcs] if self.srcs is not None else None
         if self.srcs is not None:
             s = []
             for src in self.srcs:
@@ -148,7 +147,6 @@ def generate_inst(node_graph, pe_per_pu):
                     node.inst.append(inst)
             else: # non-source nodes
                 if len(node.children) > 1: # multiple target PEs
-                    #multicast(node, pe_per_pu)
                     dest_pes = [c.pe for c in node.children]
                     src_pes = [p.pe for p in node.parents]
                     source = None
@@ -160,7 +158,6 @@ def generate_inst(node_graph, pe_per_pu):
                 else: # single target PE
                     srcs = []
                     for parent_node in node.parents:
-                        # TODO: kind of a quick fix...
                         if len(parent_node.children) > 1 and parent_node.parents != ['Source']: # multicasting happend
                             src = get_src_multicast(node.pe, parent_node.pe)
                         else:
@@ -173,7 +170,6 @@ def generate_inst(node_graph, pe_per_pu):
                                 child_node = p
                                 model_parent = p
                                 break
-                        #dst = get_dest(node.pe, child_node.pe, pe_per_pu, node)
                         index = model_parent.inst[0].dests[0].index
                         dst = Dest("NW", str(index))
                         dests = []

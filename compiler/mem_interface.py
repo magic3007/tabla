@@ -265,7 +265,7 @@ def gen_meminst(m):
     for i in range(maxcycle):
         instrs.append(gen_read_inst())
         data_read = get_data_allaxi_cycle(i, axi_list)
-        print("cycle ", i, ": ", data_read)
+        #print("cycle ", i, ": ", data_read)
         lanesbyshift = get_lanesbyshift(data_read)
         #print("lanes by shift: ", lanesbyshift)
         for shiftamount in lanesbyshift:

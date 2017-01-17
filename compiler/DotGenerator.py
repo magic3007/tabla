@@ -66,7 +66,8 @@ class DotGenerator:
         'model_input': 'skyblue',
         'model_output': 'hotpink',
         'model': 'yellow',
-        'constant': 'gray'
+        'constant': 'gray',
+        'gradient': 'green'
     }
 
     def getLabel(self, node):
